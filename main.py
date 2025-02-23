@@ -335,8 +335,6 @@ class BudgetTracker:
         self.income_ax.set_title("Income Breakdown", color="white", pad=20)
         self.income_canvas.draw()
 
-        import matplotlib.pyplot as plt
-
     def on_expense_hover(self, event):
         if not self.expenses:
             return
