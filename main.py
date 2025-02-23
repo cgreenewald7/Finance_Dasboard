@@ -286,35 +286,6 @@ class BudgetTracker:
         color = "green" if net_income >= 0 else "red"
         self.net_label.config(text=f"Net Income ({current_month}): ${net_income:.2f}", fg=color)
         
-    # def on_income_hover(self, event):
-    #     if not self.income:
-    #         return
-    #     explode = [0] * len(self.income)
-    #     hovered = False
-    #     for i, wedge in enumerate(self.income_wedges):
-    #         if event.inaxes == self.income_ax and wedge.contains_point([event.x, event.y]):
-    #             explode[i] = 0.1
-    #             self.income_center_text.set_text(f"${self.income_amounts[i]:.2f}")
-    #             hovered = True
-        
-    #     self.income_ax.clear()
-    #     wedges, texts, autotexts = self.income_ax.pie(
-    #         self.income_amounts, autopct='', startangle=90,
-    #         textprops={'color': 'white'}, colors=plt.cm.Set3.colors,
-    #         explode=explode
-    #     )
-    #     for text in texts:
-    #         text.set_visible(False)
-    #     for autotext in autotexts:
-    #         autotext.set_visible(False)
-    #     self.income_wedges = wedges
-    #     self.income_autotexts = autotexts
-    #     total_income = sum(i["amount"] for i in self.income)
-    #     if not hovered:
-    #         self.income_center_text.set_text(f"${total_income:.2f}")
-    #     self.income_ax.set_title("Income Breakdown", color="white", pad=20)
-    #     self.income_canvas.draw()
-    import matplotlib.pyplot as plt
 
     def on_income_hover(self, event):
         if not self.income:
@@ -424,41 +395,6 @@ class BudgetTracker:
         # Restore chart title and update canvas
         self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
         self.expense_canvas.draw()
-
-    # def on_expense_hover(self, event):
-    #     if not self.expenses:
-    #         return
-    #     category_totals = {}
-    #     for exp in self.expenses:
-    #         cat = exp["category"]
-    #         category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
-    #     amounts = list(category_totals.values())
-    #     labels = list(category_totals.keys())
-    #     explode = [0] * len(amounts)
-    #     hovered = False
-    #     for i, wedge in enumerate(self.expense_wedges):
-    #         if event.inaxes == self.expense_ax and wedge.contains_point([event.x, event.y]):
-    #             explode[i] = 0.1
-    #             self.expense_center_text.set_text(f"${self.expense_amounts[i]:.2f}")
-    #             hovered = True
-        
-    #     self.expense_ax.clear()
-    #     wedges, texts, autotexts = self.expense_ax.pie(
-    #         amounts, autopct='', startangle=90,
-    #         textprops={'color': 'white'}, colors=plt.cm.Paired.colors,
-    #         explode=explode
-    #     )
-    #     for text in texts:
-    #         text.set_visible(False)
-    #     for autotext in autotexts:
-    #         autotext.set_visible(False)
-    #     self.expense_wedges = wedges
-    #     self.expense_autotexts = autotexts
-    #     total_expense = sum(e["amount"] for e in self.expenses)
-    #     if not hovered:
-    #         self.expense_center_text.set_text(f"${total_expense:.2f}")
-    #     self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
-    #     self.expense_canvas.draw()
         
     def on_income_click(self, event):
         if event.inaxes != self.income_ax or not self.income:
