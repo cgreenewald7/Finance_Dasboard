@@ -11,7 +11,7 @@ class BudgetTracker:
         self.income = []
         
         self.categories = [
-            "Housing", "Transportation", "Food", "Entertainment",
+            "Housing", "Transportation", "Food", "Entertainment", "Activities", "Groceries",
             "Utilities", "Healthcare", "Shopping", "Other"
         ]
         
@@ -33,6 +33,7 @@ class BudgetTracker:
         self.style.map("TButton",
                       background=[('active', '#45a049')])
         
+        self.showing_list = False
         self.setup_gui()
         
     def setup_gui(self):
@@ -56,15 +57,15 @@ class BudgetTracker:
         ttk.Button(button_frame, text="Analyze", 
                   command=self.analyze_months, style="TButton").pack(side="left", padx=20)
         
-        chart_frame = tk.Frame(self.root, bg="#1a1a1a")
-        chart_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        self.chart_frame = tk.Frame(self.root, bg="#1a1a1a")
+        self.chart_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
-        chart_frame.grid_columnconfigure((0, 1), weight=1)
+        self.chart_frame.grid_columnconfigure((0, 1), weight=1)
         
         self.income_fig, self.income_ax = plt.subplots(figsize=(5, 5))
         self.income_fig.patch.set_facecolor('#1a1a1a')
         self.income_ax.set_facecolor('#2d2d2d')
-        self.income_canvas = tkagg.FigureCanvasTkAgg(self.income_fig, master=chart_frame)
+        self.income_canvas = tkagg.FigureCanvasTkAgg(self.income_fig, master=self.chart_frame)
         self.income_canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=10)
         self.income_fig.canvas.mpl_connect('motion_notify_event', self.on_income_hover)
         self.income_fig.canvas.mpl_connect('button_press_event', self.on_income_click)
@@ -72,11 +73,21 @@ class BudgetTracker:
         self.expense_fig, self.expense_ax = plt.subplots(figsize=(5, 5))
         self.expense_fig.patch.set_facecolor('#1a1a1a')
         self.expense_ax.set_facecolor('#2d2d2d')
-        self.expense_canvas = tkagg.FigureCanvasTkAgg(self.expense_fig, master=chart_frame)
+        self.expense_canvas = tkagg.FigureCanvasTkAgg(self.expense_fig, master=self.chart_frame)
         self.expense_canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", padx=10)
         self.expense_fig.canvas.mpl_connect('motion_notify_event', self.on_expense_hover)
         self.expense_fig.canvas.mpl_connect('button_press_event', self.on_expense_click)
         
+        self.view_list_button = ttk.Button(self.chart_frame, text="View List", 
+                                          command=self.toggle_expense_view, style="TButton")
+        self.view_list_button.grid(row=1, column=1, pady=5)
+        
+        # Expense Listbox (initially hidden)
+        self.expense_listbox = tk.Listbox(self.chart_frame, bg="#2d2d2d", fg="white", 
+                                         font=("Arial", 12), width=50, height=20)
+        self.expense_listbox.grid(row=0, column=0, sticky="nsew", padx=10)
+        self.expense_listbox.grid_remove()  # Hide initially
+
         self.net_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.net_frame.pack(fill="x", pady=5)
         self.net_label = tk.Label(self.net_frame, text="Net Income: $0.00", 
@@ -209,6 +220,10 @@ class BudgetTracker:
         ttk.Button(window, text="Add Expense", command=add_expense).pack(pady=20)
         
     def update_charts(self):
+        if self.showing_list:
+            self.update_expense_list()
+            return
+        
         # Income Chart
         self.income_ax.clear()
         total_income = sum(i["amount"] for i in self.income)
@@ -223,14 +238,11 @@ class BudgetTracker:
             amounts = [i["amount"] for i in self.income]
             explode = [0] * len(amounts)
             wedges, texts, autotexts = self.income_ax.pie(
-                amounts, autopct='', startangle=90,  # Removed labels parameter
-                textprops={'color': 'white'}, colors=plt.cm.Set3.colors,
-                explode=explode
+                amounts, labels=sources, autopct='', startangle=90, 
+                textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Set3.colors,
+                explode=explode, labeldistance=1.1
             )
-            for text in texts:
-                text.set_visible(False)
-            for autotext in autotexts:
-                autotext.set_visible(False)
+
             self.income_wedges = wedges
             self.income_autotexts = autotexts
             self.income_amounts = amounts
@@ -259,14 +271,11 @@ class BudgetTracker:
             labels = list(category_totals.keys())
             explode = [0] * len(amounts)
             wedges, texts, autotexts = self.expense_ax.pie(
-                amounts, autopct='', startangle=90,  # Removed labels parameter
-                textprops={'color': 'white'}, colors=plt.cm.Paired.colors,
-                explode=explode
+                amounts, labels=labels, autopct='', startangle=90, 
+                textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Paired.colors,
+                explode=explode, labeldistance=1.1
             )
-            for text in texts:
-                text.set_visible(False)
-            for autotext in autotexts:
-                autotext.set_visible(False)
+
             self.expense_wedges = wedges
             self.expense_autotexts = autotexts
             self.expense_amounts = amounts
@@ -287,51 +296,90 @@ class BudgetTracker:
         self.net_label.config(text=f"Net Income ({current_month}): ${net_income:.2f}", fg=color)
         
 
+    def update_expense_list(self):
+        self.expense_listbox.delete(0, tk.END)
+        for exp in self.expenses:
+            self.expense_listbox.insert(tk.END, f"{exp['where']} - ${exp['amount']:.2f} ({exp['date']}) - {exp['category']}")
+        
+        # Expense Chart (still visible)
+        self.expense_ax.clear()
+        total_expense = sum(e["amount"] for e in self.expenses)
+        if not self.expenses:
+            self.expense_ax.text(0.5, 0.5, "No Expenses", ha='center', va='center', 
+                               color="white", fontsize=12)
+            self.expense_center_text = self.expense_ax.text(0, 0, "$0.00", 
+                                                          ha='center', va='center', 
+                                                          color="white", fontsize=16, fontweight='bold')
+        else:
+            category_totals = {}
+            for exp in self.expenses:
+                cat = exp["category"]
+                category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
+            amounts = list(category_totals.values())
+            labels = list(category_totals.keys())
+            explode = [0] * len(amounts)
+            wedges, texts, autotexts = self.expense_ax.pie(
+                amounts, labels=labels, autopct='', startangle=90,
+                textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Paired.colors,
+                explode=explode, labeldistance=1.1
+            )
+            self.expense_wedges = wedges
+            self.expense_amounts = amounts
+            self.expense_categories = labels
+            self.expense_center_text = self.expense_ax.text(0, 0, f"${total_expense:.2f}", 
+                                                          ha='center', va='center', 
+                                                          color="white", fontsize=16, fontweight='bold')
+        
+        self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
+        self.expense_canvas.draw()
+
+    def toggle_expense_view(self):
+        if not self.showing_list:
+            # Hide income chart, show expense list
+            self.income_canvas.get_tk_widget().grid_remove()
+            self.expense_listbox.grid()
+            self.view_list_button.config(text="See Pie Chart")
+            self.showing_list = True
+            self.update_expense_list()
+        else:
+            # Hide expense list, show income chart
+            self.expense_listbox.grid_remove()
+            self.income_canvas.get_tk_widget().grid()
+            self.view_list_button.config(text="View List")
+            self.showing_list = False
+            self.update_charts()
+
     def on_income_hover(self, event):
-        if not self.income:
+        if not self.income or self.showing_list:
             return
         
-        explode = [0] * len(self.income)  # Default: no exploded slices
+        amounts = [i["amount"] for i in self.income]
+        sources = [i["source"] for i in self.income]
+        explode = [0] * len(amounts)  # Match length to number of wedges
         hovered = False
         
-        # Determine which wedge is hovered over
         for i, wedge in enumerate(self.income_wedges):
             if event.inaxes == self.income_ax and wedge.contains_point([event.x, event.y]):
                 explode[i] = 0.1
                 hovered_text = f"${self.income_amounts[i]:.2f}"
                 hovered = True
-                break  # Only explode one section at a time
-
-        # Clear and redraw the chart
-        self.income_ax.clear()
+                break
         
-        # Redraw the pie chart with the updated explode values
+        self.income_ax.clear()
         wedges, texts, autotexts = self.income_ax.pie(
-            self.income_amounts, autopct='', startangle=90,
-            textprops={'color': 'white'}, colors=plt.cm.Set3.colors,
-            explode=explode
+            amounts, labels=sources, autopct='', startangle=90,
+            textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Set3.colors,
+            explode=explode, labeldistance=1.1
         )
         
-        # Hide text labels
-        for text in texts:
-            text.set_visible(False)
-        for autotext in autotexts:
-            autotext.set_visible(False)
-        
-        # Update stored references
         self.income_wedges = wedges
-        self.income_autotexts = autotexts
-        
-        # Restore or update the center text
         total_income = sum(i["amount"] for i in self.income)
         center_text = hovered_text if hovered else f"${total_income:.2f}"
         
-        # Instead of relying on self.income_center_text, use text() directly
         self.income_center_text = self.income_ax.text(
             0, 0, center_text, ha='center', va='center', fontsize=14, color="white"
         )
         
-        # Restore chart title and update canvas
         self.income_ax.set_title("Income Breakdown", color="white", pad=20)
         self.income_canvas.draw()
 
@@ -366,16 +414,16 @@ class BudgetTracker:
         
         # Redraw pie chart with updated explode effect
         wedges, texts, autotexts = self.expense_ax.pie(
-            amounts, autopct='', startangle=90,
+            amounts, labels=labels, autopct='', startangle=90,
             textprops={'color': 'white'}, colors=plt.cm.Paired.colors,
-            explode=explode
+            explode=explode, labeldistance=1.1
         )
 
-        # Hide text labels to maintain clean UI
-        for text in texts:
-            text.set_visible(False)
-        for autotext in autotexts:
-            autotext.set_visible(False)
+        # # Hide text labels to maintain clean UI
+        # for text in texts:
+        #     text.set_visible(False)
+        # for autotext in autotexts:
+        #     autotext.set_visible(False)
         
         # Update stored references
         self.expense_wedges = wedges
@@ -490,3 +538,4 @@ class BudgetTracker:
 if __name__ == "__main__":
     tracker = BudgetTracker()
     tracker.run()
+
