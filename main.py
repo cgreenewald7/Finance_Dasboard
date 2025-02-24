@@ -3,7 +3,7 @@ import matplotlib.backends.backend_tkagg as tkagg
 import tkinter as tk
 from tkinter import ttk, messagebox  # Added messagebox for better error handling
 from tkcalendar import Calendar
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class BudgetTracker:
     def __init__(self):
@@ -16,7 +16,7 @@ class BudgetTracker:
         ]
         
         self.root = tk.Tk()
-        self.root.title("Budget Master Pro")
+        self.root.title("Budget Master Beta")
         self.root.geometry("1000x850")
         self.root.configure(bg="#1a1a1a")
         
@@ -34,6 +34,7 @@ class BudgetTracker:
                       background=[('active', '#45a049')])
         
         self.showing_list = False
+        self.current_month = datetime.now().strftime("%Y-%m")
         self.setup_gui()
         
     def setup_gui(self):
@@ -41,11 +42,18 @@ class BudgetTracker:
         header_frame.pack(fill="x")
         
         title_label = tk.Label(header_frame, 
-                              text="Budget Master Pro",
+                              text="Budget Master Beta",
                               font=("Arial", 24, "bold"),
                               fg="#ffffff",
                               bg="#252526")
         title_label.pack()
+
+        # Month selection dropdown in top right
+        self.month_var = tk.StringVar(value=self.current_month)
+        self.month_dropdown = ttk.Combobox(header_frame, textvariable=self.month_var, 
+                                          values=self.get_month_options(), state="readonly")
+        self.month_dropdown.pack(side="right", padx=10)
+        self.month_dropdown.bind("<<ComboboxSelected>>", self.update_month_view)
         
         button_frame = tk.Frame(self.root, bg="#1a1a1a", pady=10)
         button_frame.pack(fill="x")
@@ -102,6 +110,21 @@ class BudgetTracker:
         
         self.update_charts()
         
+    def get_month_options(self):
+        """Generate a list of month options (e.g., '2025-01', '2025-02') for the last 12 months and next 6 months."""
+        current_date = datetime.now()
+        options = []
+        for i in range(-12, 7):  # Last 12 months and next 6 months
+            month_date = current_date + timedelta(days=30 * i)
+            options.append(month_date.strftime("%Y-%m"))
+        return sorted(options, reverse=True)  # Newest first
+    
+    def update_month_view(self, event):
+        """Update the view when a new month is selected from the dropdown."""
+        self.current_month = self.month_var.get()
+        self.update_charts()
+
+
     def open_income_window(self):
         window = tk.Toplevel(self.root)
         window.title("Add Income")
