@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox  # Added messagebox for better error handling
 from tkcalendar import Calendar
 from datetime import datetime, timedelta
+import matplotlib.patches as patches
 
 class BudgetTracker:
     def __init__(self):
@@ -12,7 +13,7 @@ class BudgetTracker:
         
         self.categories = [
             "Housing", "Transportation", "Food", "Entertainment", "Activities", "Groceries",
-            "Utilities", "Healthcare", "Shopping", "Other"
+            "Utilities", "Healthcare", "Shopping", "Savings", "Charitable", "Other"
         ]
         
         self.root = tk.Tk()
@@ -95,6 +96,10 @@ class BudgetTracker:
                                          font=("Arial", 12), width=50, height=20)
         self.expense_listbox.grid(row=0, column=0, sticky="nsew", padx=10)
         self.expense_listbox.grid_remove()  # Hide initially
+
+        # Budget bar frame (new, placed above net income)
+        self.budget_frame = tk.Frame(self.root, bg="#1a1a1a")
+        self.budget_frame.pack(fill="x", pady=5)
 
         self.net_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.net_frame.pack(fill="x", pady=5)
@@ -257,9 +262,11 @@ class BudgetTracker:
                                                         ha='center', va='center', 
                                                         color="white", fontsize=16, fontweight='bold')
         else:
+            month_income = [i for i in self.income if i["date"].startswith(self.current_month)]
             sources = [i["source"] for i in self.income]
             amounts = [i["amount"] for i in self.income]
             explode = [0] * len(amounts)
+
             wedges, texts, autotexts = self.income_ax.pie(
                 amounts, labels=sources, autopct='', startangle=90, 
                 textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Set3.colors,
@@ -310,6 +317,77 @@ class BudgetTracker:
         self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
         self.expense_canvas.draw()
         
+        # 50/30/20 Budget Bar 
+        needs_categories = ["Housing", "Transportation", "Groceries", "Utilities", "Healthcare"]
+        wants_categories = ["Food", "Entertainment", "Activities", "Shopping"]
+        savings_categories = ["Savings", "Charitable"]
+
+        needs_spent = sum(e["amount"] for e in self.expenses if e["date"].startswith(self.current_month) and e["category"] in needs_categories)
+        wants_spent = sum(e["amount"] for e in self.expenses if e["date"].startswith(self.current_month) and e["category"] in wants_categories)
+        savings_spent = sum(e["amount"] for e in self.expenses if e["date"].startswith(self.current_month) and e["category"] in savings_categories)
+
+        needs_budget = total_income * 0.50
+        wants_budget = total_income * 0.30
+        savings_budget = total_income * 0.20
+
+        # Create sleek budget bar with soft gray color and rounded edges
+        budget_fig, budget_ax = plt.subplots(figsize=(7, 0.4))
+        bar_height = 0.2
+        # Needs section with left rounded edge
+        needs_width = min(needs_spent, needs_budget)
+        if total_income > 0:
+            needs_rect = patches.FancyBboxPatch((0, 0), needs_width, bar_height, 
+                                            boxstyle="round,pad=0.5,rounding_size=0.1", 
+                                            facecolor='#4CAF50', edgecolor='white', linewidth=1, alpha=0.9)
+            budget_ax.add_patch(needs_rect)
+
+        # Wants section (middle, no curved edges)
+        wants_width = min(wants_spent, wants_budget)
+        if total_income > 0:
+            wants_rect = patches.FancyBboxPatch((needs_budget + 0.05 * total_income, 0), wants_width, bar_height, 
+                                            boxstyle="round,pad=0.05,rounding_size=1", 
+                                            facecolor='#2196F3', edgecolor='white', linewidth=1, alpha=0.9)
+            budget_ax.add_patch(wants_rect)
+
+        # Savings section with right rounded edge
+        savings_width = min(savings_spent, savings_budget)
+        if total_income > 0:
+            savings_rect = patches.FancyBboxPatch((needs_budget + wants_budget + 0.1 * total_income, 0), savings_width, bar_height, 
+                                                boxstyle="round,pad=0.05,rounding_size=1", 
+                                                facecolor='#FFC107', edgecolor='white', linewidth=1, alpha=0.9)
+            budget_ax.add_patch(savings_rect)
+
+        # # Add labels
+        # if total_income > 0:
+        #     budget_ax.text(needs_budget / 2, bar_height + 0.05, f"Needs\n${needs_spent:.2f}/{needs_budget:.2f}", 
+        #                 ha='center', va='bottom', color="white", fontsize=8, fontweight='bold', 
+        #                 bbox=dict(facecolor='black', alpha=0.3, edgecolor='none', pad=2))
+        #     budget_ax.text(needs_budget + wants_budget / 2 + 0.05 * total_income, bar_height + 0.05, f"Wants\n${wants_spent:.2f}/{wants_budget:.2f}", 
+        #                 ha='center', va='bottom', color="white", fontsize=8, fontweight='bold', 
+        #                 bbox=dict(facecolor='black', alpha=0.3, edgecolor='none', pad=2))
+        #     budget_ax.text(needs_budget + wants_budget + savings_budget / 2 + 0.1 * total_income, bar_height + 0.05, f"Savings\n${savings_spent:.2f}/{savings_budget:.2f}", 
+        #                 ha='center', va='bottom', color="white", fontsize=8, fontweight='bold', 
+        #                 bbox=dict(facecolor='black', alpha=0.3, edgecolor='none', pad=2))
+
+        # Remove the grid, ticks, and set smooth background
+        budget_ax.set_xlim(0, total_income if total_income > 0 else 1)
+        budget_ax.set_ylim(0, 0.4)
+        budget_ax.set_yticks([])
+        budget_ax.set_xticks([])
+        budget_ax.set_facecolor('#2d2d2d')  # Dark background
+        budget_fig.patch.set_facecolor('#1a1a1a')  # Dark background for the figure
+
+        # Remove green border and spines around the plot
+        for spine in budget_ax.spines.values():
+            spine.set_visible(False)
+
+        # Clear previous budget bar and draw new one
+        for widget in self.budget_frame.winfo_children():
+            widget.destroy()
+        budget_canvas = tkagg.FigureCanvasTkAgg(budget_fig, master=self.budget_frame)
+        budget_canvas.get_tk_widget().pack(fill="x")
+        budget_canvas.draw()
+
         # Update Net Income
         current_month = datetime.now().strftime("%Y-%m")
         month_income = sum(i["amount"] for i in self.income if i["date"].startswith(current_month))
