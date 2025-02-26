@@ -34,14 +34,16 @@ class BudgetTracker:
         self.style.map("TButton",
                       background=[('active', '#45a049')])
         
-        # Enhanced Treeview styling for Excel-like appearance
+        # Treeview styling with horizontal lines via tags
         self.style.configure("Treeview",
                             background="#2d2d2d",
                             foreground="white",
                             fieldbackground="#2d2d2d",
                             font=("Arial", 12),
                             rowheight=25,
-                            borderwidth=1)
+                            borderwidth=0,
+                            relief="flat",
+                            highlightthickness=0)
         self.style.configure("Treeview.Heading",
                             font=("Arial", 12, "bold"),
                             background="#3c3f41",
@@ -533,7 +535,7 @@ class BudgetTracker:
         center_text = hovered_text if hovered else f"${total_income:.2f}"
         
         self.income_center_text = self.income_ax.text(
-            0, 0, center_text, ha='center', va='center', fontsize=14, color="white"
+            0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
         )
         
         self.income_ax.set_title("Income Breakdown", color="white", pad=20)
@@ -591,7 +593,7 @@ class BudgetTracker:
 
         # Explicitly re-add the center text after clearing the axis
         self.expense_center_text = self.expense_ax.text(
-            0, 0, center_text, ha='center', va='center', fontsize=14, color="white"
+            0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
         )
 
         # Restore chart title and update canvas
