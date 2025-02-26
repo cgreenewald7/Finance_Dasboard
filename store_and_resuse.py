@@ -170,6 +170,7 @@ class BudgetTracker:
                                           command=self.toggle_expense_view, style="TButton")
         self.view_list_button.grid(row=1, column=1, pady=5)
         
+        # Expense table frame
         table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
         table_frame.grid(row=0, column=0, sticky="nsew", padx=10)
         table_frame.grid_remove()
@@ -194,6 +195,21 @@ class BudgetTracker:
         
         self.table_frame = table_frame
 
+        # New analysis listbox frame
+        analysis_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
+        analysis_frame.grid(row=0, column=0, sticky="nsew", padx=10)
+        analysis_frame.grid_remove()
+        
+        self.analysis_listbox = tk.Listbox(analysis_frame, height=20, bg="#2d2d2d", 
+                                          fg="white", font=("Arial", 12))
+        self.analysis_listbox.pack(side="left", fill="both", expand=True)
+        
+        analysis_scrollbar = ttk.Scrollbar(analysis_frame, orient="vertical", command=self.analysis_listbox.yview)
+        analysis_scrollbar.pack(side="right", fill="y")
+        self.analysis_listbox.configure(yscrollcommand=analysis_scrollbar.set)
+        
+        self.analysis_frame = analysis_frame
+
         self.budget_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.budget_frame.pack(fill="x", pady=5)
 
@@ -205,7 +221,7 @@ class BudgetTracker:
         
         self.detail_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.detail_frame.pack(fill="x", padx=20, pady=10)
-        self.detail_listbox = tk.Listbox(self.detail_frame, height=10, bg="#2d2d2d", 
+        self.detail_listbox = tk.Listbox(self.detail_frame, height=20, bg="#2d2d2d", 
                                         fg="white", font=("Arial", 12))
         self.detail_listbox.pack(fill="x")
         
@@ -525,16 +541,26 @@ class BudgetTracker:
     def toggle_expense_view(self):
         if not self.showing_list:
             self.income_canvas.get_tk_widget().grid_remove()
+            self.analysis_frame.grid_remove()  # Hide analysis if visible
             self.table_frame.grid()
             self.view_list_button.config(text="See Pie Chart")
             self.showing_list = True
             self.update_expense_table()
         else:
             self.table_frame.grid_remove()
+            self.analysis_frame.grid_remove()  # Ensure analysis stays hidden
             self.income_canvas.get_tk_widget().grid()
             self.view_list_button.config(text="View List")
             self.showing_list = False
             self.update_charts()
+
+    def hide_analysis_view(self):
+        self.analysis_frame.grid_remove()
+        self.table_frame.grid_remove()  # Ensure expense table stays hidden
+        self.income_canvas.get_tk_widget().grid()
+        self.view_list_button.config(text="View List", command=self.toggle_expense_view)
+        self.showing_list = False
+        self.update_charts()
 
     def on_income_hover(self, event):
         income, _ = self.get_month_data(self.current_month)
@@ -673,54 +699,63 @@ class BudgetTracker:
                 _, expenses1 = self.get_month_data(month1)
                 _, expenses2 = self.get_month_data(month2)
                 
-                self.detail_listbox.delete(0, tk.END)
+                # Show analysis frame and hide income chart
+                self.income_canvas.get_tk_widget().grid_remove()
+                self.table_frame.grid_remove()  # Hide expense table if visible
+                self.analysis_frame.grid()
+                self.view_list_button.config(text="Back to Charts", command=self.hide_analysis_view)
+                self.showing_list = True  # Reuse flag to track state
+                
+                self.analysis_listbox.delete(0, tk.END)
                 
                 if category == "All Categories":
-                    # Total spending comparison
                     month1_total = sum(exp["amount"] for exp in expenses1)
                     month2_total = sum(exp["amount"] for exp in expenses2)
-                    self.detail_listbox.insert(tk.END, "Analysis for All Categories:")
-                    self.detail_listbox.insert(tk.END, f"Total {month1}: ${month1_total:.2f}")
-                    self.detail_listbox.insert(tk.END, f"Total {month2}: ${month2_total:.2f}")
-                    self.detail_listbox.insert(tk.END, "-" * 30)
+                    self.analysis_listbox.insert(tk.END, "✨ MONTHLY SPENDING ANALYSIS ✨")
+                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
+                    self.analysis_listbox.insert(tk.END, f"📅 {month1}: 💰 ${month1_total:.2f}")
+                    self.analysis_listbox.insert(tk.END, f"📅 {month2}: 💰 ${month2_total:.2f}")
+                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
                     if month1_total > month2_total:
-                        self.detail_listbox.insert(tk.END, f"More total spent in {month1}")
+                        self.analysis_listbox.insert(tk.END, f"📈 {month1} outspent {month2} by ${month1_total - month2_total:.2f}")
                     elif month2_total > month1_total:
-                        self.detail_listbox.insert(tk.END, f"More total spent in {month2}")
+                        self.analysis_listbox.insert(tk.END, f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
                     else:
-                        self.detail_listbox.insert(tk.END, "Equal total spending")
-                    self.detail_listbox.insert(tk.END, "-" * 30)
+                        self.analysis_listbox.insert(tk.END, "⚖️ Spending is perfectly balanced!")
+                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
                     
-                    # Individual category comparison
-                    self.detail_listbox.insert(tk.END, "Breakdown by Category:")
+                    self.analysis_listbox.insert(tk.END, "🔍 Category Breakdown")
+                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
                     for cat in self.categories:
                         month1_cat_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == cat)
                         month2_cat_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == cat)
-                        if month1_cat_total > 0 or month2_cat_total > 0:  # Only show categories with spending
-                            self.detail_listbox.insert(tk.END, f"{cat}:")
-                            self.detail_listbox.insert(tk.END, f"  {month1}: ${month1_cat_total:.2f}")
-                            self.detail_listbox.insert(tk.END, f"  {month2}: ${month2_cat_total:.2f}")
+                        if month1_cat_total > 0 or month2_cat_total > 0:
+                            self.analysis_listbox.insert(tk.END, f"🏷️ {cat.upper()}")
+                            self.analysis_listbox.insert(tk.END, f"  📅 {month1}: 💵 ${month1_cat_total:.2f}")
+                            self.analysis_listbox.insert(tk.END, f"  📅 {month2}: 💵 ${month2_cat_total:.2f}")
                             if month1_cat_total > month2_cat_total:
-                                self.detail_listbox.insert(tk.END, f"  More spent in {month1}")
+                                diff = month1_cat_total - month2_cat_total
+                                self.analysis_listbox.insert(tk.END, f"  📈 {month1} wins by ${diff:.2f}")
                             elif month2_cat_total > month1_cat_total:
-                                self.detail_listbox.insert(tk.END, f"  More spent in {month2}")
+                                diff = month2_cat_total - month1_cat_total
+                                self.analysis_listbox.insert(tk.END, f"  📈 {month2} wins by ${diff:.2f}")
                             else:
-                                self.detail_listbox.insert(tk.END, "  Equal spending")
-                            self.detail_listbox.insert(tk.END, "-" * 30)
+                                self.analysis_listbox.insert(tk.END, "  ⚖️ Even spending")
+                            self.analysis_listbox.insert(tk.END, "─" * 30)
                 else:
-                    # Specific category comparison
                     month1_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == category)
                     month2_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == category)
-                    self.detail_listbox.insert(tk.END, f"Analysis for {category}:")
-                    self.detail_listbox.insert(tk.END, f"{month1}: ${month1_total:.2f}")
-                    self.detail_listbox.insert(tk.END, f"{month2}: ${month2_total:.2f}")
-                    self.detail_listbox.insert(tk.END, "-" * 30)
+                    self.analysis_listbox.insert(tk.END, f"✨ ANALYSIS FOR {category.upper()} ✨")
+                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
+                    self.analysis_listbox.insert(tk.END, f"📅 {month1}: 💰 ${month1_total:.2f}")
+                    self.analysis_listbox.insert(tk.END, f"📅 {month2}: 💰 ${month2_total:.2f}")
+                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
                     if month1_total > month2_total:
-                        self.detail_listbox.insert(tk.END, f"More spent in {month1}")
+                        self.analysis_listbox.insert(tk.END, f"📈 {month1} outspent {month2} by ${month1_total - month2_total:.2f}")
                     elif month2_total > month1_total:
-                        self.detail_listbox.insert(tk.END, f"More spent in {month2}")
+                        self.analysis_listbox.insert(tk.END, f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
                     else:
-                        self.detail_listbox.insert(tk.END, "Equal spending")
+                        self.analysis_listbox.insert(tk.END, "⚖️ Spending is perfectly balanced!")
                 
                 window.destroy()
             except Exception as e:
