@@ -34,7 +34,29 @@ class BudgetTracker:
         self.style.map("TButton",
                       background=[('active', '#45a049')])
         
+        # Enhanced Treeview styling for Excel-like appearance
+        self.style.configure("Treeview",
+                            background="#2d2d2d",
+                            foreground="white",
+                            fieldbackground="#2d2d2d",
+                            font=("Arial", 12),
+                            rowheight=25,
+                            borderwidth=1)
+        self.style.configure("Treeview.Heading",
+                            font=("Arial", 12, "bold"),
+                            background="#3c3f41",
+                            foreground="white",
+                            borderwidth=1,
+                            relief="solid")
+        self.style.map("Treeview",
+                      background=[('selected', '#4CAF50')])
+        self.style.layout("Treeview", [
+            ('Treeview.treearea', {'sticky': 'nswe'})
+        ])
+
         self.showing_list = False
+        # self.expense_tree.pack(pady=10)
+        
         self.current_month = datetime.now().strftime("%Y-%m")
         self.setup_gui()
         
@@ -91,11 +113,32 @@ class BudgetTracker:
                                           command=self.toggle_expense_view, style="TButton")
         self.view_list_button.grid(row=1, column=1, pady=5)
         
-        # Expense Listbox (initially hidden)
-        self.expense_listbox = tk.Listbox(self.chart_frame, bg="#2d2d2d", fg="white", 
-                                         font=("Arial", 12), width=50, height=20)
-        self.expense_listbox.grid(row=0, column=0, sticky="nsew", padx=10)
-        self.expense_listbox.grid_remove()  # Hide initially
+        # Expense Table with Scrollbar
+        table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
+        table_frame.grid(row=0, column=0, sticky="nsew", padx=10)
+        table_frame.grid_remove()  # Hide initially
+        
+        self.expense_tree = ttk.Treeview(table_frame, 
+                                        columns=("Date", "Recipient", "Amount", "Category"), 
+                                        show="headings", height=20)
+        self.expense_tree.heading("Date", text="Date")
+        self.expense_tree.heading("Recipient", text="Recipient")
+        self.expense_tree.heading("Amount", text="Amount")
+        self.expense_tree.heading("Category", text="Category")
+        # Uniform column widths for grid-like appearance
+        uniform_width = 75
+        self.expense_tree.column("Date", width=uniform_width, anchor="center")
+        self.expense_tree.column("Recipient", width=uniform_width, anchor="w")
+        self.expense_tree.column("Amount", width=uniform_width, anchor="e")
+        self.expense_tree.column("Category", width=uniform_width, anchor="w")
+        self.expense_tree.pack(side="left", fill="both", expand=True)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.expense_tree.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.expense_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.table_frame = table_frame  # Store reference for toggling
 
         # Budget bar frame (new, placed above net income)
         self.budget_frame = tk.Frame(self.root, bg="#1a1a1a")
@@ -397,12 +440,24 @@ class BudgetTracker:
         self.net_label.config(text=f"Net Income ({current_month}): ${net_income:.2f}", fg=color)
         
 
-    def update_expense_list(self):
-        self.expense_listbox.delete(0, tk.END)
-        for exp in self.expenses:
-            self.expense_listbox.insert(tk.END, f"{exp['where']} - ${exp['amount']:.2f} ({exp['date']}) - {exp['category']}")
+    def update_expense_table(self):
+        # Clear current table
+        for item in self.expense_tree.get_children():
+            self.expense_tree.delete(item)
         
-        # Expense Chart (still visible)
+        # Sort expenses by date (descending)
+        sorted_expenses = sorted(self.expenses, key=lambda x: x["date"], reverse=True)
+        
+        # Insert sorted expenses into table
+        for exp in sorted_expenses:
+            self.expense_tree.insert("", "end", values=(
+                exp["date"],
+                exp["where"],
+                f"${exp['amount']:.2f}",
+                exp["category"]
+            ))
+        
+        # Update expense chart (still visible)
         self.expense_ax.clear()
         total_expense = sum(e["amount"] for e in self.expenses)
         if not self.expenses:
@@ -436,15 +491,15 @@ class BudgetTracker:
 
     def toggle_expense_view(self):
         if not self.showing_list:
-            # Hide income chart, show expense list
+            # Hide income chart, show expense table
             self.income_canvas.get_tk_widget().grid_remove()
-            self.expense_listbox.grid()
+            self.table_frame.grid()
             self.view_list_button.config(text="See Pie Chart")
             self.showing_list = True
-            self.update_expense_list()
+            self.update_expense_table()
         else:
-            # Hide expense list, show income chart
-            self.expense_listbox.grid_remove()
+            # Hide expense table, show income chart
+            self.table_frame.grid_remove()
             self.income_canvas.get_tk_widget().grid()
             self.view_list_button.config(text="View List")
             self.showing_list = False
