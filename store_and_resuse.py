@@ -11,13 +11,10 @@ from matplotlib.colors import LinearSegmentedColormap
 
 class BudgetTracker:
     def __init__(self):
-        self.expenses = []
-        self.income = []
-        self.data_file = "budget_data.csv"  # CSV file name
-        
+        self.data_file = "budget_data.csv"
         self.categories = [
-            "Bills", "Transportation", "Food", "Entertainment", "Activities", "Groceries",
-            "Utilities", "Healthcare", "Shopping", "Savings", "Charitable", "Coffee", "Other"
+            "Housing", "Transportation", "Food", "Entertainment", "Activities", "Groceries",
+            "Utilities", "Healthcare", "Shopping", "Savings", "Charitable", "Other"
         ]
         
         self.root = tk.Tk()
@@ -38,7 +35,6 @@ class BudgetTracker:
         self.style.map("TButton",
                       background=[('active', '#45a049')])
         
-        # Treeview styling with horizontal lines via tags
         self.style.configure("Treeview",
                             background="#2d2d2d",
                             foreground="white",
@@ -63,42 +59,41 @@ class BudgetTracker:
         self.showing_list = False
         self.current_month = datetime.now().strftime("%Y-%m")
         self.budget_canvas = None
+        self.all_income = []  # Store all income across months
+        self.all_expenses = []  # Store all expenses across months
         
-        # Load data from CSV at startup
         self.load_data()
         self.setup_gui()
-        
+
     def load_data(self):
-        """Load income and expenses from the CSV file if it exists."""
+        self.all_income = []
+        self.all_expenses = []
         if os.path.exists(self.data_file):
             with open(self.data_file, mode='r', newline='') as file:
                 reader = csv.DictReader(file)
-                self.income = []
-                self.expenses = []
                 for row in reader:
                     if row["type"] == "income":
-                        self.income.append({
+                        self.all_income.append({
                             "source": row["source"],
                             "amount": float(row["amount"]),
-                            "date": row["date"]
+                            "date": row["date"],
+                            "month": row["date"][:7]  # Extract YYYY-MM
                         })
                     elif row["type"] == "expense":
-                        self.expenses.append({
+                        self.all_expenses.append({
                             "where": row["where"],
                             "amount": float(row["amount"]),
                             "date": row["date"],
-                            "category": row["category"]
+                            "category": row["category"],
+                            "month": row["date"][:7]  # Extract YYYY-MM
                         })
 
     def save_data(self):
-        """Save income and expenses to the CSV file."""
         with open(self.data_file, mode='w', newline='') as file:
             fieldnames = ["type", "source", "where", "amount", "date", "category"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
-            
-            # Write income data
-            for inc in self.income:
+            for inc in self.all_income:
                 writer.writerow({
                     "type": "income",
                     "source": inc["source"],
@@ -107,9 +102,7 @@ class BudgetTracker:
                     "date": inc["date"],
                     "category": ""
                 })
-            
-            # Write expense data
-            for exp in self.expenses:
+            for exp in self.all_expenses:
                 writer.writerow({
                     "type": "expense",
                     "source": "",
@@ -119,12 +112,18 @@ class BudgetTracker:
                     "category": exp["category"]
                 })
 
+    def get_month_data(self, month):
+        """Filter income and expenses for the given month."""
+        income = [i for i in self.all_income if i["month"] == month]
+        expenses = [e for e in self.all_expenses if e["month"] == month]
+        return income, expenses
+
     def setup_gui(self):
         header_frame = tk.Frame(self.root, bg="#252526", pady=10)
         header_frame.pack(fill="x")
         
         title_label = tk.Label(header_frame, 
-                              text="Budget Beta",
+                              text="Budget Master Beta",
                               font=("Arial", 24, "bold"),
                               fg="#ffffff",
                               bg="#252526")
@@ -171,7 +170,6 @@ class BudgetTracker:
                                           command=self.toggle_expense_view, style="TButton")
         self.view_list_button.grid(row=1, column=1, pady=5)
         
-        # Expense Table with Scrollbar
         table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
         table_frame.grid(row=0, column=0, sticky="nsew", padx=10)
         table_frame.grid_remove()
@@ -212,15 +210,16 @@ class BudgetTracker:
         self.detail_listbox.pack(fill="x")
         
         self.update_charts()
-        
+
     def get_month_options(self):
+        # Include all months from data plus current month
+        months = set(i["month"] for i in self.all_income) | set(e["month"] for e in self.all_expenses)
         current_date = datetime.now()
-        options = []
         for i in range(-12, 7):
             month_date = current_date + timedelta(days=30 * i)
-            options.append(month_date.strftime("%Y-%m"))
-        return sorted(options, reverse=True)
-    
+            months.add(month_date.strftime("%Y-%m"))
+        return sorted(months, reverse=True)
+
     def update_month_view(self, event):
         self.current_month = self.month_var.get()
         self.update_charts()
@@ -267,20 +266,23 @@ class BudgetTracker:
                 amount = amount_entry.get()
                 if not amount:
                     raise ValueError("Amount cannot be empty")
+                date = date_entry.get()
                 income = {
                     "source": source_entry.get(),
                     "amount": float(amount),
-                    "date": date_entry.get()
+                    "date": date,
+                    "month": date[:7]  # Extract YYYY-MM
                 }
-                self.income.append(income)
+                self.all_income.append(income)
                 self.update_charts()
-                self.save_data()  # Save to CSV after adding
+                self.save_data()
+                self.month_dropdown['values'] = self.get_month_options()  # Update dropdown
                 window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
                 
         ttk.Button(window, text="Add Income", command=add_income).pack(pady=20)
-        
+
     def open_expense_window(self):
         window = tk.Toplevel(self.root)
         window.title("Add Expense")
@@ -329,38 +331,42 @@ class BudgetTracker:
                 amount = amount_entry.get()
                 if not amount:
                     raise ValueError("Amount cannot be empty")
+                date = date_entry.get()
                 expense = {
                     "where": where_entry.get(),
                     "amount": float(amount),
-                    "date": date_entry.get(),
-                    "category": category_var.get()
+                    "date": date,
+                    "category": category_var.get(),
+                    "month": date[:7]  # Extract YYYY-MM
                 }
-                self.expenses.append(expense)
+                self.all_expenses.append(expense)
                 self.update_charts()
-                self.save_data()  # Save to CSV after adding
+                self.save_data()
+                self.month_dropdown['values'] = self.get_month_options()  # Update dropdown
                 window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
                 
         ttk.Button(window, text="Add Expense", command=add_expense).pack(pady=20)
-        
+
     def update_charts(self):
+        income, expenses = self.get_month_data(self.current_month)
+        
         if self.showing_list:
-            self.update_expense_table()  # Fixed method name
+            self.update_expense_table()
             return
         
         self.income_ax.clear()
-        total_income = sum(i["amount"] for i in self.income)
-        if not self.income:
+        total_income = sum(i["amount"] for i in income)
+        if not income:
             self.income_ax.text(0.5, 0.5, "No Income", ha='center', va='center', 
                               color="white", fontsize=12)
             self.income_center_text = self.income_ax.text(0, 0, "$0.00", 
                                                         ha='center', va='center', 
                                                         color="white", fontsize=16, fontweight='bold')
         else:
-            month_income = [i for i in self.income if i["date"].startswith(self.current_month)]
-            sources = [i["source"] for i in self.income]
-            amounts = [i["amount"] for i in self.income]
+            sources = [i["source"] for i in income]
+            amounts = [i["amount"] for i in income]
             explode = [0] * len(amounts)
             wedges, texts, autotexts = self.income_ax.pie(
                 amounts, labels=sources, autopct='', startangle=90, 
@@ -374,12 +380,12 @@ class BudgetTracker:
                                                         ha='center', va='center', 
                                                         color="white", fontsize=16, fontweight='bold')
         
-        self.income_ax.set_title("Income Breakdown", color="white", pad=20)
+        self.income_ax.set_title(f"Income Breakdown ({self.current_month})", color="white", pad=20)
         self.income_canvas.draw()
         
         self.expense_ax.clear()
-        total_expense = sum(e["amount"] for e in self.expenses)
-        if not self.expenses:
+        total_expense = sum(e["amount"] for e in expenses)
+        if not expenses:
             self.expense_ax.text(0.5, 0.5, "No Expenses", ha='center', va='center', 
                                color="white", fontsize=12)
             self.expense_center_text = self.expense_ax.text(0, 0, "$0.00", 
@@ -387,7 +393,7 @@ class BudgetTracker:
                                                           color="white", fontsize=16, fontweight='bold')
         else:
             category_totals = {}
-            for exp in self.expenses:
+            for exp in expenses:
                 cat = exp["category"]
                 category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
             amounts = list(category_totals.values())
@@ -406,43 +412,35 @@ class BudgetTracker:
                                                           ha='center', va='center', 
                                                           color="white", fontsize=16, fontweight='bold')
         
-        self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
+        self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color="white", pad=20)
         self.expense_canvas.draw()
         
-        # Budget Bar (only visible if there's income)
         needs_categories = ["Housing", "Transportation", "Groceries", "Utilities", "Healthcare"]
         wants_categories = ["Food", "Entertainment", "Activities", "Shopping"]
         savings_categories = ["Savings", "Charitable"]
-        needs_spent = sum(e["amount"] for e in self.expenses if e["date"].startswith(self.current_month) and e["category"] in needs_categories)
-        wants_spent = sum(e["amount"] for e in self.expenses if e["date"].startswith(self.current_month) and e["category"] in wants_categories)
-        savings_spent = sum(e["amount"] for e in self.expenses if e["date"].startswith(self.current_month) and e["category"] in savings_categories)
+        needs_spent = sum(e["amount"] for e in expenses if e["category"] in needs_categories)
+        wants_spent = sum(e["amount"] for e in expenses if e["category"] in wants_categories)
+        savings_spent = sum(e["amount"] for e in expenses if e["category"] in savings_categories)
         needs_budget = total_income * 0.50
         wants_budget = total_income * 0.30
         savings_budget = total_income * 0.20
 
-        # Clear previous budget bar
         for widget in self.budget_frame.winfo_children():
             widget.destroy()
         
-        if total_income > 0:  # Only show if there's income
+        if total_income > 0:
             budget_fig, budget_ax = plt.subplots(figsize=(8, 0.6))
             bar_height = 0.4
-
-            # Define gradient colors
-            needs_cmap = LinearSegmentedColormap.from_list("", ["#2E7D32", "#4CAF50"])  # Dark to light green
-            wants_cmap = LinearSegmentedColormap.from_list("", ["#1565C0", "#2196F3"])  # Dark to light blue
-            savings_cmap = LinearSegmentedColormap.from_list("", ["#F9A825", "#FFC107"])  # Dark to light yellow
-
-            # Needs Section
+            needs_cmap = LinearSegmentedColormap.from_list("", ["#2E7D32", "#4CAF50"])
+            wants_cmap = LinearSegmentedColormap.from_list("", ["#1565C0", "#2196F3"])
+            savings_cmap = LinearSegmentedColormap.from_list("", ["#F9A825", "#FFC107"])
             needs_width = min(needs_spent, needs_budget)
-            needs_bar = budget_ax.barh(0, needs_budget, height=bar_height, left=0, color="#4CAF50", alpha=0.3)  # Budget outline
+            needs_bar = budget_ax.barh(0, needs_budget, height=bar_height, left=0, color="#4CAF50", alpha=0.3)
             if needs_width > 0:
                 needs_fill = budget_ax.barh(0, needs_width, height=bar_height, left=0, color=needs_cmap(0.5), edgecolor="white", linewidth=1)
-                needs_fill[0].set_hatch('//')  # Add subtle pattern
+                needs_fill[0].set_hatch('//')
                 budget_ax.text(needs_budget / 2, bar_height / 2, "Needs: 50%", ha='center', va='center', color="white", 
                               fontsize=10, fontweight='bold', bbox=dict(facecolor='black', alpha=0.4, edgecolor='none'))
-
-            # Wants Section
             wants_width = min(wants_spent, wants_budget)
             wants_bar = budget_ax.barh(0, wants_budget, height=bar_height, left=needs_budget, color="#2196F3", alpha=0.3)
             if wants_width > 0:
@@ -450,8 +448,6 @@ class BudgetTracker:
                 wants_fill[0].set_hatch('..')
                 budget_ax.text(needs_budget + wants_budget / 2, bar_height / 2, "Wants: 30%", ha='center', va='center', color="white", 
                               fontsize=10, fontweight='bold', bbox=dict(facecolor='black', alpha=0.4, edgecolor='none'))
-
-            # Savings Section
             savings_width = min(savings_spent, savings_budget)
             savings_bar = budget_ax.barh(0, savings_budget, height=bar_height, left=needs_budget + wants_budget, color="#FFC107", alpha=0.3)
             if savings_width > 0:
@@ -459,8 +455,6 @@ class BudgetTracker:
                 savings_fill[0].set_hatch('xx')
                 budget_ax.text(needs_budget + wants_budget + savings_budget / 2, bar_height / 2, "Savings: 20%", ha='center', va='center', color="white", 
                               fontsize=10, fontweight='bold', bbox=dict(facecolor='black', alpha=0.4, edgecolor='none'))
-
-            # Styling
             budget_ax.set_xlim(0, total_income)
             budget_ax.set_ylim(0, bar_height)
             budget_ax.set_yticks([])
@@ -469,28 +463,22 @@ class BudgetTracker:
             budget_fig.patch.set_facecolor('#1a1a1a')
             for spine in budget_ax.spines.values():
                 spine.set_visible(False)
-
-            # Add subtle shadow effect
             budget_ax.add_patch(patches.Rectangle((0, -0.05), total_income, bar_height + 0.1, facecolor="gray", alpha=0.2, zorder=-1))
-
             self.budget_canvas = tkagg.FigureCanvasTkAgg(budget_fig, master=self.budget_frame)
             self.budget_canvas.get_tk_widget().pack(fill="x")
             self.budget_canvas.draw()
         else:
-            self.budget_canvas = None  # No canvas if no income
+            self.budget_canvas = None
 
-            
-        current_month = datetime.now().strftime("%Y-%m")
-        month_income = sum(i["amount"] for i in self.income if i["date"].startswith(current_month))
-        month_expense = sum(e["amount"] for e in self.expenses if e["date"].startswith(current_month))
-        net_income = month_income - month_expense
+        net_income = total_income - total_expense
         color = "green" if net_income >= 0 else "red"
-        self.net_label.config(text=f"Net Income ({current_month}): ${net_income:.2f}", fg=color)
+        self.net_label.config(text=f"Net Income ({self.current_month}): ${net_income:.2f}", fg=color)
 
     def update_expense_table(self):
+        _, expenses = self.get_month_data(self.current_month)
         for item in self.expense_tree.get_children():
             self.expense_tree.delete(item)
-        sorted_expenses = sorted(self.expenses, key=lambda x: x["date"], reverse=True)
+        sorted_expenses = sorted(expenses, key=lambda x: x["date"], reverse=True)
         for i, exp in enumerate(sorted_expenses):
             self.expense_tree.insert("", "end", values=(
                 exp["date"],
@@ -499,13 +487,13 @@ class BudgetTracker:
                 exp["category"]
             ), tags=('row',))
             self.expense_tree.tag_configure('row', background="#2d2d2d")
-            # if i < len(sorted_expenses) - 1:
-            #     self.expense_tree.insert("", "end", values=("", "", "", ""), tags=('separator',))
-            #     self.expense_tree.tag_configure('separator', background="#3c3f41", font=("Arial", 1))
+            if i < len(sorted_expenses) - 1:
+                self.expense_tree.insert("", "end", values=("", "", "", ""), tags=('separator',))
+                self.expense_tree.tag_configure('separator', background="#3c3f41", font=("Arial", 1))
         
         self.expense_ax.clear()
-        total_expense = sum(e["amount"] for e in self.expenses)
-        if not self.expenses:
+        total_expense = sum(e["amount"] for e in expenses)
+        if not expenses:
             self.expense_ax.text(0.5, 0.5, "No Expenses", ha='center', va='center', 
                                color="white", fontsize=12)
             self.expense_center_text = self.expense_ax.text(0, 0, "$0.00", 
@@ -513,7 +501,7 @@ class BudgetTracker:
                                                           color="white", fontsize=16, fontweight='bold')
         else:
             category_totals = {}
-            for exp in self.expenses:
+            for exp in expenses:
                 cat = exp["category"]
                 category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
             amounts = list(category_totals.values())
@@ -531,7 +519,7 @@ class BudgetTracker:
                                                           ha='center', va='center', 
                                                           color="white", fontsize=16, fontweight='bold')
         
-        self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
+        self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color="white", pad=20)
         self.expense_canvas.draw()
 
     def toggle_expense_view(self):
@@ -549,11 +537,12 @@ class BudgetTracker:
             self.update_charts()
 
     def on_income_hover(self, event):
-        if not self.income or self.showing_list:
+        income, _ = self.get_month_data(self.current_month)
+        if not income or self.showing_list:
             return
         
-        amounts = [i["amount"] for i in self.income]
-        sources = [i["source"] for i in self.income]
+        amounts = [i["amount"] for i in income]
+        sources = [i["source"] for i in income]
         explode = [0] * len(amounts)
         hovered = False
         
@@ -570,27 +559,24 @@ class BudgetTracker:
             textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Set3.colors,
             explode=explode, labeldistance=1.1
         )
-        
         self.income_wedges = wedges
-        total_income = sum(i["amount"] for i in self.income)
+        total_income = sum(i["amount"] for i in income)
         center_text = hovered_text if hovered else f"${total_income:.2f}"
-        
         self.income_center_text = self.income_ax.text(
             0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
         )
-        
-        self.income_ax.set_title("Income Breakdown", color="white", pad=20)
+        self.income_ax.set_title(f"Income Breakdown ({self.current_month})", color="white", pad=20)
         self.income_canvas.draw()
 
     def on_expense_hover(self, event):
-        if not self.expenses:
+        _, expenses = self.get_month_data(self.current_month)
+        if not expenses:
             return
         
         category_totals = {}
-        for exp in self.expenses:
+        for exp in expenses:
             cat = exp["category"]
             category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
-        
         amounts = list(category_totals.values())
         labels = list(category_totals.keys())
         explode = [0] * len(amounts)
@@ -617,24 +603,26 @@ class BudgetTracker:
         self.expense_center_text = self.expense_ax.text(
             0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
         )
-        self.expense_ax.set_title("Expense Breakdown", color="white", pad=20)
+        self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color="white", pad=20)
         self.expense_canvas.draw()
-        
+
     def on_income_click(self, event):
-        if event.inaxes != self.income_ax or not self.income:
+        income, _ = self.get_month_data(self.current_month)
+        if event.inaxes != self.income_ax or not income:
             return
         self.detail_listbox.delete(0, tk.END)
         for i, wedge in enumerate(self.income_wedges):
             if wedge.contains_point([event.x, event.y]):
-                inc = self.income[i]
+                inc = income[i]
                 self.detail_listbox.insert(tk.END, f"Income: {inc['source']}")
                 self.detail_listbox.insert(tk.END, f"Amount: ${inc['amount']:.2f}")
                 self.detail_listbox.insert(tk.END, f"Date: {inc['date']}")
                 self.detail_listbox.insert(tk.END, "-" * 30)
                 break
-        
+
     def on_expense_click(self, event):
-        if event.inaxes != self.expense_ax or not self.expenses:
+        _, expenses = self.get_month_data(self.current_month)
+        if event.inaxes != self.expense_ax or not expenses:
             return
         self.detail_listbox.delete(0, tk.END)
         for i, wedge in enumerate(self.expense_wedges):
@@ -642,14 +630,14 @@ class BudgetTracker:
                 category = self.expense_categories[i]
                 self.detail_listbox.insert(tk.END, f"Category: {category}")
                 total = 0
-                for exp in self.expenses:
+                for exp in expenses:
                     if exp["category"] == category:
                         self.detail_listbox.insert(tk.END, f"{exp['where']} - ${exp['amount']:.2f} ({exp['date']})")
                         total += exp["amount"]
                 self.detail_listbox.insert(tk.END, f"Total: ${total:.2f}")
                 self.detail_listbox.insert(tk.END, "-" * 30)
                 break
-    
+
     def analyze_months(self):
         window = tk.Toplevel(self.root)
         window.title("Analyze Months")
@@ -681,12 +669,10 @@ class BudgetTracker:
                 month1 = month1_entry.get()
                 month2 = month2_entry.get()
                 category = category_var.get()
-                
-                month1_total = sum(exp["amount"] for exp in self.expenses 
-                                 if exp["date"].startswith(month1) and exp["category"] == category)
-                month2_total = sum(exp["amount"] for exp in self.expenses 
-                                 if exp["date"].startswith(month2) and exp["category"] == category)
-                
+                _, expenses1 = self.get_month_data(month1)
+                _, expenses2 = self.get_month_data(month2)
+                month1_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == category)
+                month2_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == category)
                 self.detail_listbox.delete(0, tk.END)
                 self.detail_listbox.insert(tk.END, f"Analysis for {category}:")
                 self.detail_listbox.insert(tk.END, f"{month1}: ${month1_total:.2f}")
@@ -698,19 +684,18 @@ class BudgetTracker:
                     self.detail_listbox.insert(tk.END, f"More spent in {month2}")
                 else:
                     self.detail_listbox.insert(tk.END, "Equal spending")
-                
                 window.destroy()
             except Exception as e:
                 print(f"Error: {e}")
                 
         ttk.Button(window, text="Compare", command=compare_months).pack(pady=20)
-    
+
     def on_closing(self):
-        self.save_data()  # Save data before closing
+        self.save_data()
         plt.close('all')
         self.root.destroy()
         self.root.quit()
-    
+
     def run(self):
         self.root.mainloop()
 
