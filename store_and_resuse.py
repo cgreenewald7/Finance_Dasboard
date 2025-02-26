@@ -370,7 +370,7 @@ class BudgetTracker:
             explode = [0] * len(amounts)
             wedges, texts, autotexts = self.income_ax.pie(
                 amounts, labels=sources, autopct='', startangle=90, 
-                textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Set3.colors,
+                textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Paired.colors,
                 explode=explode, labeldistance=1.1
             )
             self.income_wedges = wedges
@@ -556,7 +556,7 @@ class BudgetTracker:
         self.income_ax.clear()
         wedges, texts, autotexts = self.income_ax.pie(
             amounts, labels=sources, autopct='', startangle=90,
-            textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Set3.colors,
+            textprops={'color': 'white', 'fontsize': 10}, colors=plt.cm.Paired.colors,
             explode=explode, labeldistance=1.1
         )
         self.income_wedges = wedges
@@ -660,9 +660,10 @@ class BudgetTracker:
         
         tk.Label(frame, text="Category:", fg="white", bg="#2d2d2d").grid(row=2, column=0, padx=5, pady=5)
         category_var = tk.StringVar()
-        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.categories)
+        category_options = ["All Categories"] + self.categories
+        category_combo = ttk.Combobox(frame, textvariable=category_var, values=category_options)
         category_combo.grid(row=2, column=1, padx=5, pady=5)
-        category_combo.set("Other")
+        category_combo.set("All Categories")
         
         def compare_months():
             try:
@@ -671,24 +672,63 @@ class BudgetTracker:
                 category = category_var.get()
                 _, expenses1 = self.get_month_data(month1)
                 _, expenses2 = self.get_month_data(month2)
-                month1_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == category)
-                month2_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == category)
+                
                 self.detail_listbox.delete(0, tk.END)
-                self.detail_listbox.insert(tk.END, f"Analysis for {category}:")
-                self.detail_listbox.insert(tk.END, f"{month1}: ${month1_total:.2f}")
-                self.detail_listbox.insert(tk.END, f"{month2}: ${month2_total:.2f}")
-                self.detail_listbox.insert(tk.END, "-" * 30)
-                if month1_total > month2_total:
-                    self.detail_listbox.insert(tk.END, f"More spent in {month1}")
-                elif month2_total > month1_total:
-                    self.detail_listbox.insert(tk.END, f"More spent in {month2}")
+                
+                if category == "All Categories":
+                    # Total spending comparison
+                    month1_total = sum(exp["amount"] for exp in expenses1)
+                    month2_total = sum(exp["amount"] for exp in expenses2)
+                    self.detail_listbox.insert(tk.END, "Analysis for All Categories:")
+                    self.detail_listbox.insert(tk.END, f"Total {month1}: ${month1_total:.2f}")
+                    self.detail_listbox.insert(tk.END, f"Total {month2}: ${month2_total:.2f}")
+                    self.detail_listbox.insert(tk.END, "-" * 30)
+                    if month1_total > month2_total:
+                        self.detail_listbox.insert(tk.END, f"More total spent in {month1}")
+                    elif month2_total > month1_total:
+                        self.detail_listbox.insert(tk.END, f"More total spent in {month2}")
+                    else:
+                        self.detail_listbox.insert(tk.END, "Equal total spending")
+                    self.detail_listbox.insert(tk.END, "-" * 30)
+                    
+                    # Individual category comparison
+                    self.detail_listbox.insert(tk.END, "Breakdown by Category:")
+                    for cat in self.categories:
+                        month1_cat_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == cat)
+                        month2_cat_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == cat)
+                        if month1_cat_total > 0 or month2_cat_total > 0:  # Only show categories with spending
+                            self.detail_listbox.insert(tk.END, f"{cat}:")
+                            self.detail_listbox.insert(tk.END, f"  {month1}: ${month1_cat_total:.2f}")
+                            self.detail_listbox.insert(tk.END, f"  {month2}: ${month2_cat_total:.2f}")
+                            if month1_cat_total > month2_cat_total:
+                                self.detail_listbox.insert(tk.END, f"  More spent in {month1}")
+                            elif month2_cat_total > month1_cat_total:
+                                self.detail_listbox.insert(tk.END, f"  More spent in {month2}")
+                            else:
+                                self.detail_listbox.insert(tk.END, "  Equal spending")
+                            self.detail_listbox.insert(tk.END, "-" * 30)
                 else:
-                    self.detail_listbox.insert(tk.END, "Equal spending")
+                    # Specific category comparison
+                    month1_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == category)
+                    month2_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == category)
+                    self.detail_listbox.insert(tk.END, f"Analysis for {category}:")
+                    self.detail_listbox.insert(tk.END, f"{month1}: ${month1_total:.2f}")
+                    self.detail_listbox.insert(tk.END, f"{month2}: ${month2_total:.2f}")
+                    self.detail_listbox.insert(tk.END, "-" * 30)
+                    if month1_total > month2_total:
+                        self.detail_listbox.insert(tk.END, f"More spent in {month1}")
+                    elif month2_total > month1_total:
+                        self.detail_listbox.insert(tk.END, f"More spent in {month2}")
+                    else:
+                        self.detail_listbox.insert(tk.END, "Equal spending")
+                
                 window.destroy()
             except Exception as e:
                 print(f"Error: {e}")
+                messagebox.showerror("Error", "Invalid input. Please check month format (YYYY-MM).")
                 
         ttk.Button(window, text="Compare", command=compare_months).pack(pady=20)
+
 
     def on_closing(self):
         self.save_data()
