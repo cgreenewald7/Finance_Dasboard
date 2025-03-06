@@ -595,9 +595,11 @@ class BudgetTracker:
         self.income_canvas.draw()
 
     def on_expense_hover(self, event):
-        _, expenses = self.get_month_data(self.current_month)
+        income, expenses = self.get_month_data(self.current_month)
         if not expenses:
             return
+        
+        total_income = sum(i["amount"] for i in income)  # Get total income for percentage calculation
         
         category_totals = {}
         for exp in expenses:
@@ -612,7 +614,8 @@ class BudgetTracker:
         for i, wedge in enumerate(self.expense_wedges):
             if event.inaxes == self.expense_ax and wedge.contains_point([event.x, event.y]):
                 explode[i] = 0.1
-                hovered_text = f"${amounts[i]:.2f}"
+                percentage = (amounts[i] / total_income) * 100 if total_income > 0 else 0
+                hovered_text = f"${amounts[i]:.2f}\n{percentage:.1f}% of Income"
                 hovered = True
                 break
         
@@ -624,7 +627,7 @@ class BudgetTracker:
         )
         self.expense_wedges = wedges
         self.expense_autotexts = autotexts
-        total_expense = sum(self.expense_amounts)
+        total_expense = sum(amounts)
         center_text = hovered_text if hovered else f"${total_expense:.2f}"
         self.expense_center_text = self.expense_ax.text(
             0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
