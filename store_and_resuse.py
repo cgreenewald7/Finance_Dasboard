@@ -8,9 +8,16 @@ import matplotlib.patches as patches
 import csv
 import os
 from matplotlib.colors import LinearSegmentedColormap
+from pathlib import Path
 
 class BudgetTracker:
     def __init__(self):
+        # user specific directory for CSV file
+        # home_dir = Path.home()
+        # data_dir = home_dir / "Documents" / "BudgetTracker"
+        # data_dir.mkdir(parents=True, exist_ok=True)
+        # self.data_file = data_dir / "budget_data.csv"            
+
         self.data_file = "budget_data.csv"
         self.categories = [
             "Housing", "Transportation", "Food", "Entertainment", "Activities", "Groceries",
@@ -143,10 +150,22 @@ class BudgetTracker:
                               bg="#252526")
         title_label.pack()
 
+        # Container frame for label and dropdown to ensure left-to-right order
+        month_frame = tk.Frame(header_frame, bg="#252526")
+        month_frame.pack(side="right", padx=10)
+
+        # Label to the left of the dropdown
+        month_label = tk.Label(month_frame, 
+                            text="Select Month:", 
+                            font=("Arial", 12), 
+                            fg="white", 
+                            bg="#252526")
+        month_label.pack(side="left", padx=(0, 5))  # Left of dropdown, 5px gap to right
+
         self.month_var = tk.StringVar(value=self.current_month)
-        self.month_dropdown = ttk.Combobox(header_frame, textvariable=self.month_var, 
+        self.month_dropdown = ttk.Combobox(month_frame, textvariable=self.month_var, 
                                           values=self.get_month_options(), state="readonly")
-        self.month_dropdown.pack(side="right", padx=10)
+        self.month_dropdown.pack(side="left")
         self.month_dropdown.bind("<<ComboboxSelected>>", self.update_month_view)
         
         button_frame = tk.Frame(self.root, bg="#1a1a1a", pady=10)
@@ -468,14 +487,14 @@ class BudgetTracker:
             needs_bar = budget_ax.barh(0, needs_budget, height=bar_height, left=0, color="#4CAF50", alpha=0.3)
             if needs_width > 0:
                 needs_fill = budget_ax.barh(0, needs_width, height=bar_height, left=0, color=needs_cmap(0.5), edgecolor="white", linewidth=1)
-                needs_fill[0].set_hatch('//')
+                needs_fill[0].set_hatch('..')
                 budget_ax.text(needs_budget / 2, bar_height / 2, "Needs: 50%", ha='center', va='center', color="white", 
                               fontsize=10, fontweight='bold', bbox=dict(facecolor='black', alpha=0.4, edgecolor='none'))
             wants_width = min(wants_spent, wants_budget)
             wants_bar = budget_ax.barh(0, wants_budget, height=bar_height, left=needs_budget, color="#2196F3", alpha=0.3)
             if wants_width > 0:
                 wants_fill = budget_ax.barh(0, wants_width, height=bar_height, left=needs_budget, color=wants_cmap(0.5), edgecolor="white", linewidth=1)
-                wants_fill[0].set_hatch('..')
+                wants_fill[0].set_hatch('//')
                 budget_ax.text(needs_budget + wants_budget / 2, bar_height / 2, "Wants: 30%", ha='center', va='center', color="white", 
                               fontsize=10, fontweight='bold', bbox=dict(facecolor='black', alpha=0.4, edgecolor='none'))
             savings_width = min(savings_spent, savings_budget)
