@@ -35,6 +35,20 @@ class BudgetTracker:
         self.style.map("TButton",
                       background=[('active', '#45a049')])
         
+        # Modernize Combobox styling
+        self.style.configure("TCombobox",
+                            fieldbackground="#2d2d2d",
+                            background="#4CAF50",
+                            foreground="white",
+                            arrowcolor="white",
+                            borderwidth=0,
+                            font=("Arial", 12),
+                            padding=5)
+        self.style.map("TCombobox",
+                    fieldbackground=[('readonly', '#2d2d2d')],
+                    background=[('readonly', '#3c3f41'), ('active', '#45a049')],
+                    foreground=[('readonly', 'white')])
+        
         self.style.configure("Treeview",
                             background="#2d2d2d",
                             foreground="white",
@@ -679,25 +693,30 @@ class BudgetTracker:
         frame = tk.Frame(window, bg="#2d2d2d")
         frame.pack(pady=10)
         
-        tk.Label(frame, text="Month 1 (YYYY-MM):", fg="white", bg="#2d2d2d").grid(row=0, column=0, padx=5, pady=5)
-        month1_entry = ttk.Entry(frame)
-        month1_entry.grid(row=0, column=1, padx=5, pady=5)
+        # Month 1 Dropdown
+        tk.Label(frame, text="Month 1:", fg="white", bg="#2d2d2d").grid(row=0, column=0, padx=5, pady=5)
+        month1_var = tk.StringVar(value=self.current_month)  # Default to current month
+        month1_combo = ttk.Combobox(frame, textvariable=month1_var, values=self.get_month_options(), state="readonly")
+        month1_combo.grid(row=0, column=1, padx=5, pady=5)
         
-        tk.Label(frame, text="Month 2 (YYYY-MM):", fg="white", bg="#2d2d2d").grid(row=1, column=0, padx=5, pady=5)
-        month2_entry = ttk.Entry(frame)
-        month2_entry.grid(row=1, column=1, padx=5, pady=5)
+        # Month 2 Dropdown
+        tk.Label(frame, text="Month 2:", fg="white", bg="#2d2d2d").grid(row=1, column=0, padx=5, pady=5)
+        month2_var = tk.StringVar(value=self.get_month_options()[1] if len(self.get_month_options()) > 1 else self.current_month)  # Default to previous month if available
+        month2_combo = ttk.Combobox(frame, textvariable=month2_var, values=self.get_month_options(), state="readonly")
+        month2_combo.grid(row=1, column=1, padx=5, pady=5)
         
+        # Category Dropdown (already a Combobox, now styled by TCombobox)
         tk.Label(frame, text="Category:", fg="white", bg="#2d2d2d").grid(row=2, column=0, padx=5, pady=5)
         category_var = tk.StringVar()
         category_options = ["All Categories"] + self.categories
-        category_combo = ttk.Combobox(frame, textvariable=category_var, values=category_options)
+        category_combo = ttk.Combobox(frame, textvariable=category_var, values=category_options, state="readonly")
         category_combo.grid(row=2, column=1, padx=5, pady=5)
         category_combo.set("All Categories")
         
         def compare_months():
             try:
-                month1 = month1_entry.get()
-                month2 = month2_entry.get()
+                month1 = month1_var.get()
+                month2 = month2_var.get()
                 category = category_var.get()
                 _, expenses1 = self.get_month_data(month1)
                 _, expenses2 = self.get_month_data(month2)
@@ -724,7 +743,7 @@ class BudgetTracker:
                     elif month2_total > month1_total:
                         self.analysis_listbox.insert(tk.END, f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
                     else:
-                        self.analysis_listbox.insert(tk.END, "⚖️ Spending is perfectly balanced!")
+                        self.analysis_listbox.insert(tk.END, "⚖️ Total spending is equal!")
                     self.analysis_listbox.insert(tk.END, "═════════════════════════════")
                     
                     self.analysis_listbox.insert(tk.END, "🔍 Category Breakdown")
@@ -738,10 +757,10 @@ class BudgetTracker:
                             self.analysis_listbox.insert(tk.END, f"  📅 {month2}: 💵 ${month2_cat_total:.2f}")
                             if month1_cat_total > month2_cat_total:
                                 diff = month1_cat_total - month2_cat_total
-                                self.analysis_listbox.insert(tk.END, f"  📈 {month1} wins by ${diff:.2f}")
+                                self.analysis_listbox.insert(tk.END, f"  📈 {month1} outspent {month2} by ${diff:.2f}")
                             elif month2_cat_total > month1_cat_total:
                                 diff = month2_cat_total - month1_cat_total
-                                self.analysis_listbox.insert(tk.END, f"  📈 {month2} wins by ${diff:.2f}")
+                                self.analysis_listbox.insert(tk.END, f"  📈 {month2} outspent {month1} by ${diff:.2f}")
                             else:
                                 self.analysis_listbox.insert(tk.END, "  ⚖️ Even spending")
                             self.analysis_listbox.insert(tk.END, "─" * 30)
@@ -758,16 +777,16 @@ class BudgetTracker:
                     elif month2_total > month1_total:
                         self.analysis_listbox.insert(tk.END, f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
                     else:
-                        self.analysis_listbox.insert(tk.END, "⚖️ Spending is perfectly balanced!")
+                        self.analysis_listbox.insert(tk.END, "⚖️ Even Spending")
                 
                 window.destroy()
             except Exception as e:
                 print(f"Error: {e}")
-                messagebox.showerror("Error", "Invalid input. Please check month format (YYYY-MM).")
-                
+                messagebox.showerror("Error", "An error occurred. Please ensure valid months are selected.")
+        
         ttk.Button(window, text="Compare", command=compare_months).pack(pady=20)
-
-
+    
+    
     def on_closing(self):
         self.save_data()
         plt.close('all')
