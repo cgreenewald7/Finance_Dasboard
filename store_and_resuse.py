@@ -13,12 +13,12 @@ from pathlib import Path
 class BudgetTracker:
     def __init__(self):
         # user specific directory for CSV file
-        # home_dir = Path.home()
-        # data_dir = home_dir / "Documents" / "BudgetTracker"
-        # data_dir.mkdir(parents=True, exist_ok=True)
-        # self.data_file = data_dir / "budget_data.csv"            
+        home_dir = Path.home()
+        data_dir = home_dir / "Documents" / "BudgetTracker"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        self.data_file = data_dir / "budget_data.csv"            
 
-        self.data_file = "budget_data.csv"
+        # self.data_file = "budget_data.csv"
         self.categories = [
             "Housing", "Transportation", "Food", "Entertainment", "Activities", "Groceries",
             "Utilities", "Healthcare", "Shopping", "Savings", "Charitable", "Other"
