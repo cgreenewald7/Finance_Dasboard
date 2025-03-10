@@ -25,7 +25,7 @@ class BudgetTracker:
         ]
         
         self.root = tk.Tk()
-        self.root.title("Budget Master Beta")
+        self.root.title("Budget Tracker Beta")
         self.root.geometry("1000x850")
         self.root.configure(bg="#1a1a1a")
         
@@ -179,7 +179,7 @@ class BudgetTracker:
         self.income_canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=10)
         self.income_fig.canvas.mpl_connect('motion_notify_event', self.on_income_hover)
         self.income_fig.canvas.mpl_connect('button_press_event', self.on_income_click)
-        
+
         # Expense Pie Chart
         self.expense_fig, self.expense_ax = plt.subplots(figsize=(5, 5))
         self.expense_fig.patch.set_facecolor('#1a1a1a')
@@ -255,6 +255,28 @@ class BudgetTracker:
         ttk.Button(expense_button_frame, text="Delete", command=self.delete_expense, style="TButton").pack(side="left", padx=5)
         
         self.expense_table_frame = expense_table_frame
+
+        # Analysis Table Frame
+        analysis_table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
+        analysis_table_frame.grid(row=0, column=0, sticky="nsew", padx=10)
+        analysis_table_frame.grid_remove()
+        
+        self.analysis_tree = ttk.Treeview(analysis_table_frame, 
+                                        columns=("Analysis"), 
+                                        show="tree", height=20)  # Single column, no headings
+        self.analysis_tree.column("Analysis", width=300, anchor="w")
+        self.analysis_tree.pack(side="top", fill="both", expand=True)
+        
+        analysis_scrollbar = ttk.Scrollbar(analysis_table_frame, orient="vertical", command=self.analysis_tree.yview)
+        analysis_scrollbar.pack(side="right", fill="y")
+        self.analysis_tree.configure(yscrollcommand=analysis_scrollbar.set)
+        
+        analysis_button_frame = tk.Frame(analysis_table_frame, bg="#1a1a1a")
+        analysis_button_frame.pack(side="bottom", pady=5)
+        ttk.Button(analysis_button_frame, text="Close Analysis", 
+                command=self.close_analysis, style="TButton").pack(pady=5)
+        
+        self.analysis_table_frame = analysis_table_frame
 
         self.budget_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.budget_frame.pack(fill="x", pady=5)
@@ -442,7 +464,7 @@ class BudgetTracker:
                                                         ha='center', va='center', 
                                                         color="white", fontsize=16, fontweight='bold')
         
-        self.income_ax.set_title(f"Income Breakdown ({self.current_month})", color="white", pad=20)
+        self.income_ax.set_title(f"Income Breakdown", color="white", pad=20)
         self.income_canvas.draw()
         
         self.expense_ax.clear()
@@ -474,7 +496,7 @@ class BudgetTracker:
                                                           ha='center', va='center', 
                                                           color="white", fontsize=16, fontweight='bold')
         
-        self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color="white", pad=20)
+        self.expense_ax.set_title(f"Expense Breakdown", color="white", pad=20)
         self.expense_canvas.draw()
         
         needs_categories = ["Housing", "Transportation", "Groceries", "Utilities", "Healthcare"]
@@ -653,7 +675,9 @@ class BudgetTracker:
 
     def hide_analysis_view(self):
         self.analysis_frame.grid_remove()
-        self.table_frame.grid_remove()  # Ensure expense table stays hidden
+        self.income_table_frame.grid_remove()  # Ensure expense table stays hidden
+        self.expense_table_frame.grid_remove()  # Ensure expense table stays hidden
+
         self.income_canvas.get_tk_widget().grid()
         self.view_list_button.config(text="View List", command=self.toggle_expense_view)
         self.showing_list = False
@@ -688,7 +712,7 @@ class BudgetTracker:
         self.income_center_text = self.income_ax.text(
             0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
         )
-        self.income_ax.set_title(f"Income Breakdown ({self.current_month})", color="white", pad=20)
+        self.income_ax.set_title(f"Income Breakdown", color="white", pad=20)
         self.income_canvas.draw()
 
     def on_expense_hover(self, event):
@@ -729,7 +753,7 @@ class BudgetTracker:
         self.expense_center_text = self.expense_ax.text(
             0, 0, center_text, ha='center', va='center', fontsize=16, fontweight='bold', color="white"
         )
-        self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color="white", pad=20)
+        self.expense_ax.set_title(f"Expense Breakdown", color="white", pad=20)
         self.expense_canvas.draw()
 
     def on_income_click(self, event):
@@ -1000,97 +1024,106 @@ class BudgetTracker:
         
         # Month 1 Dropdown
         tk.Label(frame, text="Month 1:", fg="white", bg="#2d2d2d").grid(row=0, column=0, padx=5, pady=5)
-        month1_var = tk.StringVar(value=self.current_month)  # Default to current month
+        month1_var = tk.StringVar(value=self.current_month)
         month1_combo = ttk.Combobox(frame, textvariable=month1_var, values=self.get_month_options(), state="readonly")
         month1_combo.grid(row=0, column=1, padx=5, pady=5)
         
         # Month 2 Dropdown
         tk.Label(frame, text="Month 2:", fg="white", bg="#2d2d2d").grid(row=1, column=0, padx=5, pady=5)
-        month2_var = tk.StringVar(value=self.get_month_options()[1] if len(self.get_month_options()) > 1 else self.current_month)  # Default to previous month if available
+        previous_month = (datetime.strptime(self.current_month, "%Y-%m") - timedelta(days=30)).strftime("%Y-%m")
+        month2_var = tk.StringVar(value=previous_month if previous_month in self.get_month_options() else self.get_month_options()[1] if len(self.get_month_options()) > 1 else self.current_month)
         month2_combo = ttk.Combobox(frame, textvariable=month2_var, values=self.get_month_options(), state="readonly")
         month2_combo.grid(row=1, column=1, padx=5, pady=5)
         
-        # Category Dropdown (already a Combobox, now styled by TCombobox)
+        # Category Dropdown
         tk.Label(frame, text="Category:", fg="white", bg="#2d2d2d").grid(row=2, column=0, padx=5, pady=5)
-        category_var = tk.StringVar()
+        category_var = tk.StringVar(value="All Categories")
         category_options = ["All Categories"] + self.categories
         category_combo = ttk.Combobox(frame, textvariable=category_var, values=category_options, state="readonly")
         category_combo.grid(row=2, column=1, padx=5, pady=5)
-        category_combo.set("All Categories")
         
         def compare_months():
             try:
-                month1 = month1_var.get()
-                month2 = month2_var.get()
+                month1 = month1_combo.get()
+                month2 = month2_combo.get()
                 category = category_var.get()
                 _, expenses1 = self.get_month_data(month1)
                 _, expenses2 = self.get_month_data(month2)
                 
-                # Show analysis frame and hide income chart
+                # Hide income pie chart and show analysis table
                 self.income_canvas.get_tk_widget().grid_remove()
-                self.table_frame.grid_remove()  # Hide expense table if visible
-                self.analysis_frame.grid()
-                self.view_list_button.config(text="Back to Charts", command=self.hide_analysis_view)
-                self.showing_list = True  # Reuse flag to track state
+                self.income_table_frame.grid_remove()  # Ensure income list is hidden too
+                self.analysis_table_frame.grid()
                 
-                self.analysis_listbox.delete(0, tk.END)
+                # Clear previous analysis
+                for item in self.analysis_tree.get_children():
+                    self.analysis_tree.delete(item)
                 
                 if category == "All Categories":
+                    # Total spending comparison
                     month1_total = sum(exp["amount"] for exp in expenses1)
                     month2_total = sum(exp["amount"] for exp in expenses2)
-                    self.analysis_listbox.insert(tk.END, "✨ MONTHLY SPENDING ANALYSIS ✨")
-                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
-                    self.analysis_listbox.insert(tk.END, f"📅 {month1}: 💰 ${month1_total:.2f}")
-                    self.analysis_listbox.insert(tk.END, f"📅 {month2}: 💰 ${month2_total:.2f}")
-                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
+                    self.analysis_tree.insert("", "end", text="✨ MONTHLY SPENDING ANALYSIS ✨")
+                    self.analysis_tree.insert("", "end", text="═════════════════════════════")
+                    self.analysis_tree.insert("", "end", text=f"📅 {month1}: 💰 ${month1_total:.2f}")
+                    self.analysis_tree.insert("", "end", text=f"📅 {month2}: 💰 ${month2_total:.2f}")
+                    self.analysis_tree.insert("", "end", text="═════════════════════════════")
                     if month1_total > month2_total:
-                        self.analysis_listbox.insert(tk.END, f"📈 {month1} outspent {month2} by ${month1_total - month2_total:.2f}")
+                        self.analysis_tree.insert("", "end", text=f"📈 {month1} outspent {month2} by ${month1_total - month2_total:.2f}")
                     elif month2_total > month1_total:
-                        self.analysis_listbox.insert(tk.END, f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
+                        self.analysis_tree.insert("", "end", text=f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
                     else:
-                        self.analysis_listbox.insert(tk.END, "⚖️ Total spending is equal!")
-                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
+                        self.analysis_tree.insert("", "end", text="⚖️ Total spending is equal!")
+                    self.analysis_tree.insert("", "end", text="═════════════════════════════")
                     
-                    self.analysis_listbox.insert(tk.END, "🔍 Category Breakdown")
-                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
+                    # Individual category comparison
+                    self.analysis_tree.insert("", "end", text="🔍 Category Breakdown")
+                    self.analysis_tree.insert("", "end", text="═════════════════════════════")
                     for cat in self.categories:
                         month1_cat_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == cat)
                         month2_cat_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == cat)
                         if month1_cat_total > 0 or month2_cat_total > 0:
-                            self.analysis_listbox.insert(tk.END, f"🏷️ {cat.upper()}")
-                            self.analysis_listbox.insert(tk.END, f"  📅 {month1}: 💵 ${month1_cat_total:.2f}")
-                            self.analysis_listbox.insert(tk.END, f"  📅 {month2}: 💵 ${month2_cat_total:.2f}")
+                            self.analysis_tree.insert("", "end", text=f"🏷️ {cat.upper()}")
+                            self.analysis_tree.insert("", "end", text=f"  📅 {month1}: 💵 ${month1_cat_total:.2f}")
+                            self.analysis_tree.insert("", "end", text=f"  📅 {month2}: 💵 ${month2_cat_total:.2f}")
                             if month1_cat_total > month2_cat_total:
                                 diff = month1_cat_total - month2_cat_total
-                                self.analysis_listbox.insert(tk.END, f"  📈 {month1} outspent {month2} by ${diff:.2f}")
+                                self.analysis_tree.insert("", "end", text=f"  📈 {month1} outspent {month2} by ${diff:.2f}")
                             elif month2_cat_total > month1_cat_total:
                                 diff = month2_cat_total - month1_cat_total
-                                self.analysis_listbox.insert(tk.END, f"  📈 {month2} outspent {month1} by ${diff:.2f}")
+                                self.analysis_tree.insert("", "end", text=f"  📈 {month2} outspent {month1} by ${diff:.2f}")
                             else:
-                                self.analysis_listbox.insert(tk.END, "  ⚖️ Even spending")
-                            self.analysis_listbox.insert(tk.END, "─" * 30)
+                                self.analysis_tree.insert("", "end", text="  ⚖️ Even spending")
+                            self.analysis_tree.insert("", "end", text="─" * 30)
                 else:
+                    # Specific category comparison
                     month1_total = sum(exp["amount"] for exp in expenses1 if exp["category"] == category)
                     month2_total = sum(exp["amount"] for exp in expenses2 if exp["category"] == category)
-                    self.analysis_listbox.insert(tk.END, f"✨ ANALYSIS FOR {category.upper()} ✨")
-                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
-                    self.analysis_listbox.insert(tk.END, f"📅 {month1}: 💰 ${month1_total:.2f}")
-                    self.analysis_listbox.insert(tk.END, f"📅 {month2}: 💰 ${month2_total:.2f}")
-                    self.analysis_listbox.insert(tk.END, "═════════════════════════════")
+                    self.analysis_tree.insert("", "end", text=f"✨ ANALYSIS FOR {category.upper()} ✨")
+                    self.analysis_tree.insert("", "end", text="═════════════════════════════")
+                    self.analysis_tree.insert("", "end", text=f"📅 {month1}: 💰 ${month1_total:.2f}")
+                    self.analysis_tree.insert("", "end", text=f"📅 {month2}: 💰 ${month2_total:.2f}")
+                    self.analysis_tree.insert("", "end", text="═════════════════════════════")
                     if month1_total > month2_total:
-                        self.analysis_listbox.insert(tk.END, f"📈 {month1} outspent {month2} by ${month1_total - month2_total:.2f}")
+                        self.analysis_tree.insert("", "end", text=f"📈 {month1} outspent {month2} by ${month1_total - month2_total:.2f}")
                     elif month2_total > month1_total:
-                        self.analysis_listbox.insert(tk.END, f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
+                        self.analysis_tree.insert("", "end", text=f"📈 {month2} outspent {month1} by ${month2_total - month1_total:.2f}")
                     else:
-                        self.analysis_listbox.insert(tk.END, "⚖️ Even Spending")
+                        self.analysis_tree.insert("", "end", text="⚖️ Even Spending")
                 
                 window.destroy()
             except Exception as e:
                 print(f"Error: {e}")
-                messagebox.showerror("Error", "An error occurred. Please ensure valid months are selected.")
+                messagebox.showerror("Error", "Invalid input. Please check month format (YYYY-MM) and ensure data exists.")
         
         ttk.Button(window, text="Compare", command=compare_months).pack(pady=20)
     
+    def close_analysis(self):
+        self.analysis_table_frame.grid_remove()
+        if hasattr(self, 'showing_income_list') and self.showing_income_list:
+            self.income_table_frame.grid()
+        else:
+            self.income_canvas.get_tk_widget().grid()
     
     def on_closing(self):
         self.save_data()
