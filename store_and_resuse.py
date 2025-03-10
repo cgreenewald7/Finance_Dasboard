@@ -144,45 +144,34 @@ class BudgetTracker:
         header_frame.pack(fill="x")
         
         title_label = tk.Label(header_frame, 
-                              text="Budget Master Beta",
-                              font=("Arial", 24, "bold"),
-                              fg="#ffffff",
-                              bg="#252526")
+                            text="Budget Master Beta",
+                            font=("Arial", 24, "bold"),
+                            fg="#ffffff",
+                            bg="#252526")
         title_label.pack()
 
-        # Container frame for label and dropdown to ensure left-to-right order
-        month_frame = tk.Frame(header_frame, bg="#252526")
-        month_frame.pack(side="right", padx=10)
-
-        # Label to the left of the dropdown
-        month_label = tk.Label(month_frame, 
-                            text="Select Month:", 
-                            font=("Arial", 12), 
-                            fg="white", 
-                            bg="#252526")
-        month_label.pack(side="left", padx=(0, 5))  # Left of dropdown, 5px gap to right
-
         self.month_var = tk.StringVar(value=self.current_month)
-        self.month_dropdown = ttk.Combobox(month_frame, textvariable=self.month_var, 
-                                          values=self.get_month_options(), state="readonly")
-        self.month_dropdown.pack(side="left")
+        self.month_dropdown = ttk.Combobox(header_frame, textvariable=self.month_var, 
+                                        values=self.get_month_options(), state="readonly")
+        self.month_dropdown.pack(side="right", padx=10)
         self.month_dropdown.bind("<<ComboboxSelected>>", self.update_month_view)
         
         button_frame = tk.Frame(self.root, bg="#1a1a1a", pady=10)
         button_frame.pack(fill="x")
         
         ttk.Button(button_frame, text="Add Income", 
-                  command=self.open_income_window, style="TButton").pack(side="left", padx=20)
+                command=self.open_income_window, style="TButton").pack(side="left", padx=20)
         ttk.Button(button_frame, text="Add Expense", 
-                  command=self.open_expense_window, style="TButton").pack(side="left", padx=20)
+                command=self.open_expense_window, style="TButton").pack(side="left", padx=20)
         ttk.Button(button_frame, text="Analyze", 
-                  command=self.analyze_months, style="TButton").pack(side="left", padx=20)
+                command=self.analyze_months, style="TButton").pack(side="left", padx=20)
         
         self.chart_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.chart_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
         self.chart_frame.grid_columnconfigure((0, 1), weight=1)
         
+        # Income Pie Chart
         self.income_fig, self.income_ax = plt.subplots(figsize=(5, 5))
         self.income_fig.patch.set_facecolor('#1a1a1a')
         self.income_ax.set_facecolor('#2d2d2d')
@@ -191,6 +180,7 @@ class BudgetTracker:
         self.income_fig.canvas.mpl_connect('motion_notify_event', self.on_income_hover)
         self.income_fig.canvas.mpl_connect('button_press_event', self.on_income_click)
         
+        # Expense Pie Chart
         self.expense_fig, self.expense_ax = plt.subplots(figsize=(5, 5))
         self.expense_fig.patch.set_facecolor('#1a1a1a')
         self.expense_ax.set_facecolor('#2d2d2d')
@@ -199,16 +189,49 @@ class BudgetTracker:
         self.expense_fig.canvas.mpl_connect('motion_notify_event', self.on_expense_hover)
         self.expense_fig.canvas.mpl_connect('button_press_event', self.on_expense_click)
         
-        self.view_list_button = ttk.Button(self.chart_frame, text="View List", 
-                                          command=self.toggle_expense_view, style="TButton")
-        self.view_list_button.grid(row=1, column=1, pady=5)
+        # View Buttons
+        self.view_income_button = ttk.Button(self.chart_frame, text="View Income List", 
+                                            command=self.toggle_income_view, style="TButton")
+        self.view_income_button.grid(row=1, column=0, pady=5)
         
-        # Expense table frame
-        table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
-        table_frame.grid(row=0, column=0, sticky="nsew", padx=10)
-        table_frame.grid_remove()
+        self.view_expense_button = ttk.Button(self.chart_frame, text="View Expense List", 
+                                            command=self.toggle_expense_view, style="TButton")
+        self.view_expense_button.grid(row=1, column=1, pady=5)
         
-        self.expense_tree = ttk.Treeview(table_frame, 
+        # Income Table Frame
+        income_table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
+        income_table_frame.grid(row=0, column=0, sticky="nsew", padx=10)
+        income_table_frame.grid_remove()
+        
+        self.income_tree = ttk.Treeview(income_table_frame, 
+                                    columns=("Date", "Source", "Amount"), 
+                                    show="headings", height=20)
+        self.income_tree.heading("Date", text="Date")
+        self.income_tree.heading("Source", text="Source")
+        self.income_tree.heading("Amount", text="Amount")
+        uniform_width = 100
+        self.income_tree.column("Date", width=uniform_width, anchor="center")
+        self.income_tree.column("Source", width=uniform_width, anchor="w")
+        self.income_tree.column("Amount", width=uniform_width, anchor="e")
+        self.income_tree.pack(side="top", fill="both", expand=True)
+        
+        income_scrollbar = ttk.Scrollbar(income_table_frame, orient="vertical", command=self.income_tree.yview)
+        income_scrollbar.pack(side="right", fill="y")
+        self.income_tree.configure(yscrollcommand=income_scrollbar.set)
+        
+        income_button_frame = tk.Frame(income_table_frame, bg="#1a1a1a")
+        income_button_frame.pack(side="bottom", pady=5)
+        ttk.Button(income_button_frame, text="Edit", command=self.edit_income, style="TButton").pack(side="left", padx=5)
+        ttk.Button(income_button_frame, text="Delete", command=self.delete_income, style="TButton").pack(side="left", padx=5)
+        
+        self.income_table_frame = income_table_frame
+
+        # Expense Table Frame
+        expense_table_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
+        expense_table_frame.grid(row=0, column=1, sticky="nsew", padx=10)
+        expense_table_frame.grid_remove()
+        
+        self.expense_tree = ttk.Treeview(expense_table_frame, 
                                         columns=("Date", "Recipient", "Amount", "Category"), 
                                         show="headings", height=20)
         self.expense_tree.heading("Date", text="Date")
@@ -220,28 +243,18 @@ class BudgetTracker:
         self.expense_tree.column("Recipient", width=uniform_width, anchor="w")
         self.expense_tree.column("Amount", width=uniform_width, anchor="e")
         self.expense_tree.column("Category", width=uniform_width, anchor="w")
-        self.expense_tree.pack(side="left", fill="both", expand=True)
+        self.expense_tree.pack(side="top", fill="both", expand=True)
         
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.expense_tree.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.expense_tree.configure(yscrollcommand=scrollbar.set)
+        expense_scrollbar = ttk.Scrollbar(expense_table_frame, orient="vertical", command=self.expense_tree.yview)
+        expense_scrollbar.pack(side="right", fill="y")
+        self.expense_tree.configure(yscrollcommand=expense_scrollbar.set)
         
-        self.table_frame = table_frame
-
-        # New analysis listbox frame
-        analysis_frame = tk.Frame(self.chart_frame, bg="#1a1a1a")
-        analysis_frame.grid(row=0, column=0, sticky="nsew", padx=10)
-        analysis_frame.grid_remove()
+        expense_button_frame = tk.Frame(expense_table_frame, bg="#1a1a1a")
+        expense_button_frame.pack(side="bottom", pady=5)
+        ttk.Button(expense_button_frame, text="Edit", command=self.edit_expense, style="TButton").pack(side="left", padx=5)
+        ttk.Button(expense_button_frame, text="Delete", command=self.delete_expense, style="TButton").pack(side="left", padx=5)
         
-        self.analysis_listbox = tk.Listbox(analysis_frame, height=20, bg="#2d2d2d", 
-                                          fg="white", font=("Arial", 12))
-        self.analysis_listbox.pack(side="left", fill="both", expand=True)
-        
-        analysis_scrollbar = ttk.Scrollbar(analysis_frame, orient="vertical", command=self.analysis_listbox.yview)
-        analysis_scrollbar.pack(side="right", fill="y")
-        self.analysis_listbox.configure(yscrollcommand=analysis_scrollbar.set)
-        
-        self.analysis_frame = analysis_frame
+        self.expense_table_frame = expense_table_frame
 
         self.budget_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.budget_frame.pack(fill="x", pady=5)
@@ -249,12 +262,12 @@ class BudgetTracker:
         self.net_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.net_frame.pack(fill="x", pady=5)
         self.net_label = tk.Label(self.net_frame, text="Net Income: $0.00", 
-                                 font=("Arial", 16, "bold"), bg="#1a1a1a")
+                                font=("Arial", 16, "bold"), bg="#1a1a1a")
         self.net_label.pack()
         
         self.detail_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.detail_frame.pack(fill="x", padx=20, pady=10)
-        self.detail_listbox = tk.Listbox(self.detail_frame, height=20, bg="#2d2d2d", 
+        self.detail_listbox = tk.Listbox(self.detail_frame, height=10, bg="#2d2d2d", 
                                         fg="white", font=("Arial", 12))
         self.detail_listbox.pack(fill="x")
         
@@ -571,21 +584,72 @@ class BudgetTracker:
         self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color="white", pad=20)
         self.expense_canvas.draw()
 
-    def toggle_expense_view(self):
-        if not self.showing_list:
+    def toggle_income_view(self):
+        if not hasattr(self, 'showing_income_list'):
+            self.showing_income_list = False
+        
+        if not self.showing_income_list:
             self.income_canvas.get_tk_widget().grid_remove()
-            self.analysis_frame.grid_remove()  # Hide analysis if visible
-            self.table_frame.grid()
-            self.view_list_button.config(text="See Pie Chart")
-            self.showing_list = True
+            self.income_table_frame.grid()
+            self.view_income_button.config(text="See Pie Chart")
+            self.showing_income_list = True
+            self.update_income_table()
+        else:
+            self.income_table_frame.grid_remove()
+            self.income_canvas.get_tk_widget().grid()
+            self.view_income_button.config(text="View Income List")
+            self.showing_income_list = False
+            self.update_charts()
+
+    def toggle_expense_view(self):
+        if not hasattr(self, 'showing_expense_list'):
+            self.showing_expense_list = False
+        
+        if not self.showing_expense_list:
+            self.expense_canvas.get_tk_widget().grid_remove()
+            self.expense_table_frame.grid()
+            self.view_expense_button.config(text="See Pie Chart")
+            self.showing_expense_list = True
             self.update_expense_table()
         else:
-            self.table_frame.grid_remove()
-            self.analysis_frame.grid_remove()  # Ensure analysis stays hidden
-            self.income_canvas.get_tk_widget().grid()
-            self.view_list_button.config(text="View List")
-            self.showing_list = False
+            self.expense_table_frame.grid_remove()
+            self.expense_canvas.get_tk_widget().grid()
+            self.view_expense_button.config(text="View Expense List")
+            self.showing_expense_list = False
             self.update_charts()
+
+    def update_income_table(self):
+        income, _ = self.get_month_data(self.current_month)
+        for item in self.income_tree.get_children():
+            self.income_tree.delete(item)
+        sorted_income = sorted(income, key=lambda x: x["date"], reverse=True)
+        for i, inc in enumerate(sorted_income):
+            self.income_tree.insert("", "end", values=(
+                inc["date"],
+                inc["source"],
+                f"${inc['amount']:.2f}"
+            ), tags=('row',))
+            self.income_tree.tag_configure('row', background="#2d2d2d")
+            if i < len(sorted_income) - 1:
+                self.income_tree.insert("", "end", values=("", "", ""), tags=('separator',))
+                self.income_tree.tag_configure('separator', background="#3c3f41", font=("Arial", 1))
+
+    def update_expense_table(self):
+        _, expenses = self.get_month_data(self.current_month)
+        for item in self.expense_tree.get_children():
+            self.expense_tree.delete(item)
+        sorted_expenses = sorted(expenses, key=lambda x: x["date"], reverse=True)
+        for i, exp in enumerate(sorted_expenses):
+            self.expense_tree.insert("", "end", values=(
+                exp["date"],
+                exp["where"],
+                f"${exp['amount']:.2f}",
+                exp["category"]
+            ), tags=('row',))
+            self.expense_tree.tag_configure('row', background="#2d2d2d")
+            if i < len(sorted_expenses) - 1:
+                self.expense_tree.insert("", "end", values=("", "", "", ""), tags=('separator',))
+                self.expense_tree.tag_configure('separator', background="#3c3f41", font=("Arial", 1))
 
     def hide_analysis_view(self):
         self.analysis_frame.grid_remove()
@@ -699,6 +763,228 @@ class BudgetTracker:
                 self.detail_listbox.insert(tk.END, f"Total: ${total:.2f}")
                 self.detail_listbox.insert(tk.END, "-" * 30)
                 break
+    
+    def edit_income(self):
+        selected = self.income_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an income to edit.")
+            return
+        
+        item = self.income_tree.item(selected[0])
+        values = item['values']
+        if not values or values[0] == "":
+            messagebox.showwarning("Warning", "Please select a valid income entry.")
+            return
+        
+        date, source, amount_str = values
+        amount = float(amount_str.replace("$", ""))
+        
+        for i, inc in enumerate(self.all_income):
+            if inc["date"] == date and inc["source"] == source and inc["amount"] == amount:
+                income_index = i
+                break
+        else:
+            messagebox.showerror("Error", "Income not found.")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Edit Income")
+        window.geometry("400x350")
+        window.configure(bg="#2d2d2d")
+        
+        tk.Label(window, text="Edit Income", font=("Arial", 16, "bold"), 
+                fg="white", bg="#2d2d2d").pack(pady=10)
+        
+        frame = tk.Frame(window, bg="#2d2d2d")
+        frame.pack(pady=10)
+        
+        tk.Label(frame, text="Source:", fg="white", bg="#2d2d2d").grid(row=0, column=0, padx=5, pady=5)
+        source_entry = ttk.Entry(frame)
+        source_entry.grid(row=0, column=1, padx=5, pady=5)
+        source_entry.insert(0, source)
+        
+        tk.Label(frame, text="Amount:", fg="white", bg="#2d2d2d").grid(row=1, column=0, padx=5, pady=5)
+        amount_entry = ttk.Entry(frame)
+        amount_entry.grid(row=1, column=1, padx=5, pady=5)
+        amount_entry.insert(0, amount)
+        
+        tk.Label(frame, text="Date:", fg="white", bg="#2d2d2d").grid(row=2, column=0, padx=5, pady=5)
+        date_entry = ttk.Entry(frame)
+        date_entry.grid(row=2, column=1, padx=5, pady=5)
+        date_entry.insert(0, date)
+        
+        def update_date():
+            top = tk.Toplevel(window)
+            cal = Calendar(top, selectmode="day", date_pattern="y-mm-dd")
+            cal.pack(pady=10)
+            def set_date():
+                date_entry.delete(0, tk.END)
+                date_entry.insert(0, cal.get_date())
+                top.destroy()
+            ttk.Button(top, text="Select", command=set_date).pack(pady=5)
+        
+        ttk.Button(frame, text="📅", command=update_date, width=2).grid(row=2, column=2, padx=5)
+        
+        def save_edit():
+            try:
+                new_amount = float(amount_entry.get())
+                new_date = date_entry.get()
+                self.all_income[income_index] = {
+                    "source": source_entry.get(),
+                    "amount": new_amount,
+                    "date": new_date,
+                    "month": new_date[:7]
+                }
+                self.save_data()
+                self.update_income_table()
+                self.update_charts()
+                window.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
+        
+        ttk.Button(window, text="Save Changes", command=save_edit).pack(pady=20)
+
+    def edit_expense(self):
+        selected = self.expense_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an expense to edit.")
+            return
+        
+        item = self.expense_tree.item(selected[0])
+        values = item['values']
+        if not values or values[0] == "":
+            messagebox.showwarning("Warning", "Please select a valid expense entry.")
+            return
+        
+        date, where, amount_str, category = values
+        amount = float(amount_str.replace("$", ""))
+        
+        for i, exp in enumerate(self.all_expenses):
+            if (exp["date"] == date and exp["where"] == where and 
+                exp["amount"] == amount and exp["category"] == category):
+                expense_index = i
+                break
+        else:
+            messagebox.showerror("Error", "Expense not found.")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Edit Expense")
+        window.geometry("400x400")
+        window.configure(bg="#2d2d2d")
+        
+        tk.Label(window, text="Edit Expense", font=("Arial", 16, "bold"), 
+                fg="white", bg="#2d2d2d").pack(pady=10)
+        
+        frame = tk.Frame(window, bg="#2d2d2d")
+        frame.pack(pady=10)
+        
+        tk.Label(frame, text="Where:", fg="white", bg="#2d2d2d").grid(row=0, column=0, padx=5, pady=5)
+        where_entry = ttk.Entry(frame)
+        where_entry.grid(row=0, column=1, padx=5, pady=5)
+        where_entry.insert(0, where)
+        
+        tk.Label(frame, text="Amount:", fg="white", bg="#2d2d2d").grid(row=1, column=0, padx=5, pady=5)
+        amount_entry = ttk.Entry(frame)
+        amount_entry.grid(row=1, column=1, padx=5, pady=5)
+        amount_entry.insert(0, amount)
+        
+        tk.Label(frame, text="Date:", fg="white", bg="#2d2d2d").grid(row=2, column=0, padx=5, pady=5)
+        date_entry = ttk.Entry(frame)
+        date_entry.grid(row=2, column=1, padx=5, pady=5)
+        date_entry.insert(0, date)
+        
+        def update_date():
+            top = tk.Toplevel(window)
+            cal = Calendar(top, selectmode="day", date_pattern="y-mm-dd")
+            cal.pack(pady=10)
+            def set_date():
+                date_entry.delete(0, tk.END)
+                date_entry.insert(0, cal.get_date())
+                top.destroy()
+            ttk.Button(top, text="Select", command=set_date).pack(pady=5)
+        
+        ttk.Button(frame, text="📅", command=update_date, width=2).grid(row=2, column=2, padx=5)
+        
+        tk.Label(frame, text="Category:", fg="white", bg="#2d2d2d").grid(row=3, column=0, padx=5, pady=5)
+        category_var = tk.StringVar(value=category)
+        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.categories, state="readonly")
+        category_combo.grid(row=3, column=1, padx=5, pady=5)
+        
+        def save_edit():
+            try:
+                new_amount = float(amount_entry.get())
+                new_date = date_entry.get()
+                self.all_expenses[expense_index] = {
+                    "where": where_entry.get(),
+                    "amount": new_amount,
+                    "date": new_date,
+                    "category": category_var.get(),
+                    "month": new_date[:7]
+                }
+                self.save_data()
+                self.update_expense_table()
+                self.update_charts()
+                window.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
+        
+        ttk.Button(window, text="Save Changes", command=save_edit).pack(pady=20)
+
+    def delete_income(self):
+        selected = self.income_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an income to delete.")
+            return
+        
+        item = self.income_tree.item(selected[0])
+        values = item['values']
+        if not values or values[0] == "":
+            messagebox.showwarning("Warning", "Please select a valid income entry.")
+            return
+        
+        date, source, amount_str = values
+        amount = float(amount_str.replace("$", ""))
+        
+        if not messagebox.askyesno("Confirm", "Are you sure you want to delete this income?"):
+            return
+        
+        for i, inc in enumerate(self.all_income):
+            if inc["date"] == date and inc["source"] == source and inc["amount"] == amount:
+                del self.all_income[i]
+                break
+        
+        self.save_data()
+        self.update_income_table()
+        self.update_charts()
+
+    def delete_expense(self):
+        selected = self.expense_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an expense to delete.")
+            return
+        
+        item = self.expense_tree.item(selected[0])
+        values = item['values']
+        if not values or values[0] == "":
+            messagebox.showwarning("Warning", "Please select a valid expense entry.")
+            return
+        
+        date, where, amount_str, category = values
+        amount = float(amount_str.replace("$", ""))
+        
+        if not messagebox.askyesno("Confirm", "Are you sure you want to delete this expense?"):
+            return
+        
+        for i, exp in enumerate(self.all_expenses):
+            if (exp["date"] == date and exp["where"] == where and 
+                exp["amount"] == amount and exp["category"] == category):
+                del self.all_expenses[i]
+                break
+        
+        self.save_data()
+        self.update_expense_table()
+        self.update_charts()
 
     def analyze_months(self):
         window = tk.Toplevel(self.root)
