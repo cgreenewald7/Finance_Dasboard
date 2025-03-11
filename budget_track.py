@@ -42,7 +42,7 @@ class BudgetTracker:
         self.style.map("TButton",
                       background=[('active', '#45a049')])
         
-        # Modernize Combobox styling
+        # Combobox styling
         self.style.configure("TCombobox",
                             fieldbackground="#2d2d2d",
                             background="#4CAF50",
@@ -98,7 +98,7 @@ class BudgetTracker:
                             "source": row["source"],
                             "amount": float(row["amount"]),
                             "date": row["date"],
-                            "month": row["date"][:7]  # Extract YYYY-MM
+                            "month": row["date"][:7]  
                         })
                     elif row["type"] == "expense":
                         self.all_expenses.append({
@@ -106,7 +106,7 @@ class BudgetTracker:
                             "amount": float(row["amount"]),
                             "date": row["date"],
                             "category": row["category"],
-                            "month": row["date"][:7]  # Extract YYYY-MM
+                            "month": row["date"][:7]  
                         })
 
     def save_data(self):
@@ -355,12 +355,12 @@ class BudgetTracker:
                     "source": source_entry.get(),
                     "amount": float(amount),
                     "date": date,
-                    "month": date[:7]  # Extract YYYY-MM
+                    "month": date[:7] 
                 }
                 self.all_income.append(income)
                 self.update_charts()
                 self.save_data()
-                self.month_dropdown['values'] = self.get_month_options()  # Update dropdown
+                self.month_dropdown['values'] = self.get_month_options() 
                 window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
@@ -421,12 +421,12 @@ class BudgetTracker:
                     "amount": float(amount),
                     "date": date,
                     "category": category_var.get(),
-                    "month": date[:7]  # Extract YYYY-MM
+                    "month": date[:7]  
                 }
                 self.all_expenses.append(expense)
                 self.update_charts()
                 self.save_data()
-                self.month_dropdown['values'] = self.get_month_options()  # Update dropdown
+                self.month_dropdown['values'] = self.get_month_options() 
                 window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
