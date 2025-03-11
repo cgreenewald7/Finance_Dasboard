@@ -1,14 +1,14 @@
 # Budet Tracker Beta #
 
-Tired of using excel spread sheets for budgeting and tracking expenses? Look no further, here is a practical budgeting and tracking application for simple input entry, display, and analysis.
+Tired of using excel spreadsheets for budgeting and tracking expenses? Look no further, here is a practical budgeting and tracking application for simple input entry, display, and analysis.
 
 
 A personal finance tracker to manage income and expenses.
 
 ### Installation
-1. Download `BudgetMasterBetaSetup.exe` 
-2. Run the installer and follow the prompts.
-3. Launch "Budget Master Beta" from the Start menu or desktop shortcut.
+Download from [Releases](https://github.com/cgreenewald7/Finance_Dasboard/releases/tag/v1.0.0):
+
+- **Windows**: `BudgetTracker.exe` - Double-click to run anytime.
 
 ### Features
 - Add income and expenses with categories.
