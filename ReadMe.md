@@ -1,4 +1,4 @@
-# Budet Tracker Beta #
+# Budget Tracker #
 
 Tired of using excel spreadsheets for budgeting and tracking expenses? Look no further, here is a practical budgeting and tracking application for simple input entry, display, and analysis.
 
@@ -11,8 +11,12 @@ Download from [Releases](https://github.com/cgreenewald7/Finance_Dasboard/releas
 - **Windows**: `BudgetTracker.exe` - Double-click to run anytime.
 
 ### Features
-- Add income and expenses with categories.
+- Add income and expenses with editable categories.
+- Track authorized user spending on credit card purchases.
+- Record saving and investing as money not spent, separate from expenses.
 - Visualize spending with pie charts and budget bars.
 - Analyze spending across months.
+- Export the selected month to an Excel-friendly CSV.
+- Switch between light and dark mode.
 
 Data is saved to `~/Documents/BudgetTracker/budget_data.csv` on your device.
