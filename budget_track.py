@@ -160,6 +160,12 @@ class BudgetTracker:
             return "Savings/Investing"
         return category.strip() or "Other"
 
+    def get_expense_category_options(self, current_category=None):
+        options = [category for category in self.categories if category != "Savings/Investing"]
+        if current_category and current_category not in options:
+            options.append(current_category)
+        return sorted(options, key=str.lower)
+
     def chart_colors(self, count):
         if self.dark_mode:
             palette = (
@@ -249,7 +255,10 @@ class BudgetTracker:
                                 goal_type = row.get("goal_type", "") or "amount"
                                 self.category_goal_types[category] = goal_type if goal_type in ("amount", "percent") else "amount"
                     elif row["type"] == "category_deleted":
-                        category = self.normalize_category(row.get("category", ""))
+                        raw_category = row.get("category", "").strip()
+                        if raw_category.lower() in ("saving", "savings", "investing", "investment", "investments"):
+                            continue
+                        category = self.normalize_category(raw_category)
                         if category:
                             self.deleted_categories.add(category)
 
@@ -345,6 +354,21 @@ class BudgetTracker:
 
     def get_month_savings(self, month):
         return [s for s in self.all_savings if s["month"] == month]
+
+    def get_savings_investing_total(self, expenses, savings):
+        expense_savings = sum(
+            exp["amount"] for exp in expenses
+            if self.normalize_category(exp.get("category", "")) == "Savings/Investing"
+        )
+        transfer_savings = sum(item["amount"] for item in savings)
+        return expense_savings + transfer_savings
+
+    def get_expense_breakdown_totals(self, expenses, savings=None):
+        category_totals = {}
+        for exp in expenses:
+            cat = self.normalize_category(exp["category"])
+            category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
+        return category_totals
 
     def export_selected_month(self):
         income, expenses = self.get_month_data(self.current_month)
@@ -469,13 +493,11 @@ class BudgetTracker:
             for cell in row:
                 cell.number_format = '$#,##0.00'
 
-        expense_totals = {}
-        for exp in expenses:
-            expense_totals[exp["category"]] = expense_totals.get(exp["category"], 0) + exp["amount"]
+        expense_totals = self.get_expense_breakdown_totals(expenses, savings)
 
         total_income = sum(inc["amount"] for inc in income)
         total_expenses = sum(exp["amount"] for exp in expenses)
-        total_saved = sum(item["amount"] for item in savings)
+        total_saved = self.get_savings_investing_total(expenses, savings)
         net_total = total_income - total_expenses
 
         summary_start = transactions_ws.max_row + 3
@@ -569,6 +591,7 @@ class BudgetTracker:
         self.summary_frame = tk.Frame(self.root, bg=self.colors["bg"], padx=24)
         self.summary_frame.pack(fill="x", pady=(0, 8))
         self.summary_labels = {}
+        self.summary_cards = {}
         for key, label in (
             ("income", "Income"),
             ("expenses", "Expenses"),
@@ -584,6 +607,7 @@ class BudgetTracker:
                             fg=self.colors["text"], bg=self.colors["surface"])
             value.pack(anchor="w", pady=(3, 0))
             self.summary_labels[key] = value
+            self.summary_cards[key] = card
         
         self.chart_frame = tk.Frame(self.root, bg=self.colors["bg"])
         self.chart_frame.pack(fill="both", expand=True, padx=24, pady=10)
@@ -616,6 +640,10 @@ class BudgetTracker:
         self.view_expense_button = ttk.Button(self.chart_frame, text="View Expense List", 
                                             command=self.toggle_expense_view, style="TButton")
         self.view_expense_button.grid(row=1, column=1, pady=5)
+
+        self.view_savings_button = ttk.Button(self.chart_frame, text="View Saved/Invested List",
+                                            command=self.toggle_savings_view, style="TButton")
+        self.view_savings_button.grid(row=2, column=0, columnspan=2, pady=(0, 8))
         
         # Income Table Frame
         income_table_frame = tk.Frame(self.chart_frame, bg=self.colors["surface"], padx=8, pady=8,
@@ -679,6 +707,41 @@ class BudgetTracker:
         ttk.Button(expense_button_frame, text="Delete", command=self.delete_expense, style="TButton").pack(side="left", padx=5)
         
         self.expense_table_frame = expense_table_frame
+
+        # Saved / Invested Table Frame
+        savings_table_frame = tk.Frame(self.chart_frame, bg=self.colors["surface"], padx=8, pady=8,
+                                       highlightbackground=self.colors["border"], highlightthickness=1)
+        savings_table_frame.grid(row=0, column=0, columnspan=2, pady=(34, 0))
+        savings_table_frame.grid_remove()
+        savings_table_frame.configure(width=580, height=330)
+        savings_table_frame.pack_propagate(False)
+
+        savings_tree_frame = tk.Frame(savings_table_frame, bg=self.colors["surface"])
+        savings_tree_frame.pack(side="top", fill="both", expand=True)
+        self.savings_tree = ttk.Treeview(savings_tree_frame,
+                                        columns=("Date", "Account", "Amount", "Type"),
+                                        show="headings", height=8)
+        self.savings_tree.heading("Date", text="Date")
+        self.savings_tree.heading("Account", text="Account")
+        self.savings_tree.heading("Amount", text="Amount")
+        self.savings_tree.heading("Type", text="Type")
+        self.savings_tree.column("Date", width=100, anchor="center")
+        self.savings_tree.column("Account", width=190, anchor="w")
+        self.savings_tree.column("Amount", width=100, anchor="e")
+        self.savings_tree.column("Type", width=150, anchor="w")
+        self.savings_tree.pack(side="left", fill="both", expand=True)
+
+        savings_scrollbar = ttk.Scrollbar(savings_tree_frame, orient="vertical", command=self.savings_tree.yview)
+        savings_scrollbar.pack(side="right", fill="y")
+        self.savings_tree.configure(yscrollcommand=savings_scrollbar.set)
+
+        savings_button_frame = tk.Frame(savings_table_frame, bg=self.colors["surface"])
+        savings_button_frame.pack(side="bottom", pady=5)
+        ttk.Button(savings_button_frame, text="Edit", command=self.edit_saving, style="TButton").pack(side="left", padx=5)
+        ttk.Button(savings_button_frame, text="Delete", command=self.delete_saving, style="TButton").pack(side="left", padx=5)
+        ttk.Button(savings_button_frame, text="Close", command=self.close_savings_view, style="TButton").pack(side="left", padx=5)
+
+        self.savings_table_frame = savings_table_frame
 
         # Analysis Table Frame
         analysis_table_frame = tk.Frame(self.chart_frame, bg=self.colors["surface"], padx=8, pady=8,
@@ -782,6 +845,8 @@ class BudgetTracker:
                 }
                 self.all_income.append(income)
                 self.update_charts()
+                if hasattr(self, "showing_savings_list") and self.showing_savings_list:
+                    self.update_savings_table()
                 self.save_data()
                 self.month_dropdown['values'] = self.get_month_options()
                 window.destroy()
@@ -829,7 +894,7 @@ class BudgetTracker:
         
         tk.Label(frame, text="Category:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=3, column=0, padx=5, pady=5, sticky="e")
         category_var = tk.StringVar()
-        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.categories)
+        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.get_expense_category_options())
         category_combo.grid(row=3, column=1, padx=5, pady=5)
         category_combo.set("Other")
         tk.Label(frame, text="Type a new category to save it for future entries.",
@@ -1119,7 +1184,7 @@ class BudgetTracker:
         savings = self.get_month_savings(self.current_month)
         total_income = sum(i["amount"] for i in income)
         total_expense = sum(e["amount"] for e in expenses)
-        total_savings = sum(s["amount"] for s in savings)
+        total_savings = self.get_savings_investing_total(expenses, savings)
         net_income = total_income - total_expense
 
         if hasattr(self, "summary_labels"):
@@ -1160,16 +1225,14 @@ class BudgetTracker:
         self.income_canvas.draw()
         
         self.expense_ax.clear()
-        if not expenses:
+        category_totals = self.get_expense_breakdown_totals(expenses, savings)
+        total_breakdown = sum(category_totals.values())
+        if not category_totals:
             self.expense_ax.text(0.5, 0.5, "No Expenses", ha='center', va='center', 
                                color=self.colors["muted"], fontsize=12)
             self.expense_center_text = self.expense_ax.text(0, 0, "$0.00", 
                                                           **self.center_text_style())
         else:
-            category_totals = {}
-            for exp in expenses:
-                cat = exp["category"]
-                category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
             amounts = list(category_totals.values())
             labels = list(category_totals.keys())
             explode = [0] * len(amounts)
@@ -1182,18 +1245,18 @@ class BudgetTracker:
             self.expense_autotexts = autotexts
             self.expense_amounts = amounts
             self.expense_categories = labels
-            self.expense_center_text = self.expense_ax.text(0, 0, f"${total_expense:.2f}", 
+            self.expense_center_text = self.expense_ax.text(0, 0, f"${total_breakdown:.2f}",
                                                           **self.center_text_style())
         
         self.expense_ax.set_title(f"Expense Breakdown", color=self.colors["text"], pad=20)
         self.expense_canvas.draw()
         
-        self.update_goal_progress(expenses, total_income)
+        self.update_goal_progress(expenses, savings, total_income)
 
         color = self.colors["good"] if net_income >= 0 else self.colors["bad"]
         self.net_label.config(text=f"Net Income ({self.current_month}): ${net_income:.2f}", fg=color)
 
-    def update_goal_progress(self, expenses, total_income):
+    def update_goal_progress(self, expenses, savings, total_income):
         for widget in self.budget_frame.winfo_children():
             widget.destroy()
 
@@ -1225,6 +1288,8 @@ class BudgetTracker:
         categories_with_goals = [category for category in self.categories if self.category_goals.get(category, 0) > 0]
         for category in categories_with_goals:
             spent = sum(exp["amount"] for exp in expenses if exp["category"] == category)
+            if category == "Savings/Investing":
+                spent += sum(item["amount"] for item in savings)
             goal_value = self.category_goals.get(category, 0)
             goal_type = self.category_goal_types.get(category, "amount")
             if goal_type == "percent":
@@ -1233,7 +1298,14 @@ class BudgetTracker:
             else:
                 effective_goal = goal_value
                 goal_label = f"${effective_goal:.2f}"
-            self.add_progress_row(rows_frame, category, spent, effective_goal, goal_label)
+            self.add_progress_row(
+                rows_frame,
+                category,
+                spent,
+                effective_goal,
+                goal_label,
+                is_savings_goal=(category == "Savings/Investing")
+            )
 
         if not categories_with_goals:
             tk.Label(
@@ -1244,20 +1316,25 @@ class BudgetTracker:
                 bg=self.colors["surface"],
             ).pack(anchor="w", pady=(8, 0))
 
-    def add_progress_row(self, parent, label, spent, goal, goal_label):
+    def add_progress_row(self, parent, label, spent, goal, goal_label, is_savings_goal=False):
         row = tk.Frame(parent, bg=self.colors["surface"])
         row.pack(fill="x", pady=4)
         top = tk.Frame(row, bg=self.colors["surface"])
         top.pack(fill="x")
-        over_by = spent - goal
-        within_goal = goal > 0 and over_by <= 0
         if goal <= 0:
             status = "Waiting for income"
+            is_good = False
+        elif is_savings_goal:
+            difference = spent - goal
+            is_good = difference >= 0
+            status = f"Met goal by ${difference:.2f}" if is_good else f"Under goal by ${abs(difference):.2f}"
         else:
+            over_by = spent - goal
+            is_good = over_by <= 0
             remaining = goal - spent
-            status = f"Within goal by ${remaining:.2f}" if within_goal else f"Over by ${over_by:.2f}"
-        status_color = self.colors["good"] if within_goal else self.colors["bad"]
-        bar_color = self.colors["good"] if within_goal else self.colors["bad"]
+            status = f"Within goal by ${remaining:.2f}" if is_good else f"Over by ${over_by:.2f}"
+        status_color = self.colors["good"] if is_good else self.colors["bad"]
+        bar_color = self.colors["good"] if is_good else self.colors["bad"]
         goal_text = f"${spent:.2f} / {goal_label} - {status}"
         tk.Label(top, text=label, font=("Segoe UI", 10, "bold"),
                 fg=self.colors["text"], bg=self.colors["surface"]).pack(side="left")
@@ -1274,7 +1351,7 @@ class BudgetTracker:
             ratio = min(spent / goal, 1.0) if goal else 0
             if ratio > 0:
                 bar.create_rectangle(0, 0, width * ratio, 14, fill=bar_color, outline="")
-            if goal > 0 and spent > goal:
+            if goal > 0 and spent > goal and not is_savings_goal:
                 bar.create_rectangle(width - 4, 0, width, 14, fill=self.colors["bad"], outline="")
 
         bar.bind("<Configure>", draw_bar)
@@ -1282,6 +1359,7 @@ class BudgetTracker:
 
     def update_expense_table(self):
         _, expenses = self.get_month_data(self.current_month)
+        savings = self.get_month_savings(self.current_month)
         for item in self.expense_tree.get_children():
             self.expense_tree.delete(item)
         sorted_expenses = sorted(expenses, key=lambda x: x["date"], reverse=True)
@@ -1300,17 +1378,14 @@ class BudgetTracker:
                 self.expense_tree.tag_configure('separator', background=self.colors["surface_alt"], font=("Arial", 1))
         
         self.expense_ax.clear()
-        total_expense = sum(e["amount"] for e in expenses)
-        if not expenses:
+        category_totals = self.get_expense_breakdown_totals(expenses, savings)
+        total_breakdown = sum(category_totals.values())
+        if not category_totals:
             self.expense_ax.text(0.5, 0.5, "No Expenses", ha='center', va='center', 
                                color="white", fontsize=12)
             self.expense_center_text = self.expense_ax.text(0, 0, "$0.00", 
                                                           **self.center_text_style())
         else:
-            category_totals = {}
-            for exp in expenses:
-                cat = exp["category"]
-                category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
             amounts = list(category_totals.values())
             labels = list(category_totals.keys())
             explode = [0] * len(amounts)
@@ -1322,7 +1397,7 @@ class BudgetTracker:
             self.expense_wedges = wedges
             self.expense_amounts = amounts
             self.expense_categories = labels
-            self.expense_center_text = self.expense_ax.text(0, 0, f"${total_expense:.2f}", 
+            self.expense_center_text = self.expense_ax.text(0, 0, f"${total_breakdown:.2f}",
                                                           **self.center_text_style())
         
         self.expense_ax.set_title(f"Expense Breakdown ({self.current_month})", color=self.colors["text"], pad=20)
@@ -1333,6 +1408,12 @@ class BudgetTracker:
             self.showing_income_list = False
         
         if not self.showing_income_list:
+            if hasattr(self, 'showing_savings_list') and self.showing_savings_list:
+                self.savings_table_frame.grid_remove()
+                self.view_savings_button.config(text="View Saved/Invested List")
+                self.showing_savings_list = False
+                self.income_canvas.get_tk_widget().grid()
+                self.expense_canvas.get_tk_widget().grid()
             self.income_canvas.get_tk_widget().grid_remove()
             self.income_table_frame.grid()
             self.view_income_button.config(text="See Pie Chart")
@@ -1350,6 +1431,12 @@ class BudgetTracker:
             self.showing_expense_list = False
         
         if not self.showing_expense_list:
+            if hasattr(self, 'showing_savings_list') and self.showing_savings_list:
+                self.savings_table_frame.grid_remove()
+                self.view_savings_button.config(text="View Saved/Invested List")
+                self.showing_savings_list = False
+                self.income_canvas.get_tk_widget().grid()
+                self.expense_canvas.get_tk_widget().grid()
             self.expense_canvas.get_tk_widget().grid_remove()
             self.expense_table_frame.grid()
             self.view_expense_button.config(text="See Pie Chart")
@@ -1361,6 +1448,35 @@ class BudgetTracker:
             self.view_expense_button.config(text="View Expense List")
             self.showing_expense_list = False
             self.update_charts()
+
+    def toggle_savings_view(self):
+        if not hasattr(self, 'showing_savings_list'):
+            self.showing_savings_list = False
+
+        if not self.showing_savings_list:
+            self.income_table_frame.grid_remove()
+            self.expense_table_frame.grid_remove()
+            self.income_canvas.get_tk_widget().grid()
+            self.expense_canvas.get_tk_widget().grid()
+            self.view_income_button.config(text="View Income List")
+            self.view_expense_button.config(text="View Expense List")
+            self.showing_income_list = False
+            self.showing_expense_list = False
+            self.savings_table_frame.grid()
+            self.savings_table_frame.tkraise()
+            self.view_savings_button.config(text="See Pie Charts")
+            self.showing_savings_list = True
+            self.update_savings_table()
+        else:
+            self.close_savings_view()
+
+    def close_savings_view(self):
+        if hasattr(self, "savings_table_frame"):
+            self.savings_table_frame.grid_remove()
+        if hasattr(self, "view_savings_button"):
+            self.view_savings_button.config(text="View Saved/Invested List")
+        self.showing_savings_list = False
+        self.update_charts()
 
     def update_income_table(self):
         income, _ = self.get_month_data(self.current_month)
@@ -1396,6 +1512,23 @@ class BudgetTracker:
             if i < len(sorted_expenses) - 1:
                 self.expense_tree.insert("", "end", values=("", "", "", "", "", ""), tags=('separator',))
                 self.expense_tree.tag_configure('separator', background=self.colors["surface_alt"], font=("Arial", 1))
+
+    def update_savings_table(self):
+        savings = self.get_month_savings(self.current_month)
+        for item in self.savings_tree.get_children():
+            self.savings_tree.delete(item)
+        sorted_savings = sorted(savings, key=lambda x: x["date"], reverse=True)
+        for i, saving in enumerate(sorted_savings):
+            self.savings_tree.insert("", "end", values=(
+                saving["date"],
+                saving["account"],
+                f"${saving['amount']:.2f}",
+                saving.get("category", "Other")
+            ), tags=('row',))
+            self.savings_tree.tag_configure('row', background=self.colors["surface"])
+            if i < len(sorted_savings) - 1:
+                self.savings_tree.insert("", "end", values=("", "", "", ""), tags=('separator',))
+                self.savings_tree.tag_configure('separator', background=self.colors["surface_alt"], font=("Arial", 1))
 
     def hide_analysis_view(self):
         self.analysis_frame.grid_remove()
@@ -1444,15 +1577,13 @@ class BudgetTracker:
 
     def on_expense_hover(self, event):
         income, expenses = self.get_month_data(self.current_month)
-        if not expenses:
+        savings = self.get_month_savings(self.current_month)
+        category_totals = self.get_expense_breakdown_totals(expenses, savings)
+        if not category_totals:
             return
         
         total_income = sum(i["amount"] for i in income)  # Get total income for percentage calculation
         
-        category_totals = {}
-        for exp in expenses:
-            cat = exp["category"]
-            category_totals[cat] = category_totals.get(cat, 0) + exp["amount"]
         amounts = list(category_totals.values())
         labels = list(category_totals.keys())
         explode = [0] * len(amounts)
@@ -1541,22 +1672,127 @@ class BudgetTracker:
         footer.pack(fill="x")
         ttk.Button(footer, text="Close", command=window.destroy, style="TButton").pack(side="right")
 
+    def open_savings_list_window(self, event=None):
+        _, expenses = self.get_month_data(self.current_month)
+        savings = self.get_month_savings(self.current_month)
+        savings_expenses = [
+            exp for exp in expenses
+            if self.normalize_category(exp.get("category", "")) == "Savings/Investing"
+        ]
+        total = self.get_savings_investing_total(expenses, savings)
+
+        if hasattr(self, "savings_detail_window") and self.savings_detail_window.winfo_exists():
+            self.savings_detail_window.destroy()
+
+        window = tk.Toplevel(self.root)
+        self.savings_detail_window = window
+        window.title(f"Saved / Invested - {self.current_month}")
+        window.configure(bg=self.colors["surface"])
+        window.transient(self.root)
+
+        if event is not None:
+            x = event.widget.winfo_rootx()
+            y = event.widget.winfo_rooty() + event.widget.winfo_height() + 8
+        else:
+            x = self.root.winfo_rootx() + 60
+            y = self.root.winfo_rooty() + 120
+        width = 620
+        height = 360
+        screen_width = window.winfo_screenwidth()
+        if x + width > screen_width:
+            x = max(20, screen_width - width - 20)
+        window.geometry(f"{width}x{height}+{x}+{y}")
+
+        header = tk.Frame(window, bg=self.colors["surface"], padx=16, pady=12)
+        header.pack(fill="x")
+        tk.Label(
+            header,
+            text="Saved / Invested",
+            font=("Segoe UI", 16, "bold"),
+            fg=self.colors["text"],
+            bg=self.colors["surface"],
+        ).pack(anchor="w")
+        tk.Label(
+            header,
+            text=f"Total: ${total:.2f}",
+            font=("Segoe UI", 12, "bold"),
+            fg=self.colors["accent"],
+            bg=self.colors["surface"],
+        ).pack(anchor="w", pady=(4, 0))
+
+        table_frame = tk.Frame(window, bg=self.colors["surface"], padx=12)
+        table_frame.pack(fill="both", expand=True)
+        detail_tree = ttk.Treeview(
+            table_frame,
+            columns=("Date", "Type", "Account/Place", "Amount", "Notes"),
+            show="headings",
+            height=8,
+        )
+        for heading in ("Date", "Type", "Account/Place", "Amount", "Notes"):
+            detail_tree.heading(heading, text=heading)
+        detail_tree.column("Date", width=90, anchor="center")
+        detail_tree.column("Type", width=110, anchor="w")
+        detail_tree.column("Account/Place", width=170, anchor="w")
+        detail_tree.column("Amount", width=90, anchor="e")
+        detail_tree.column("Notes", width=135, anchor="w")
+        detail_tree.pack(side="left", fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=detail_tree.yview)
+        scrollbar.pack(side="right", fill="y")
+        detail_tree.configure(yscrollcommand=scrollbar.set)
+
+        rows = []
+        for item in savings:
+            rows.append((
+                item.get("date", ""),
+                "Transfer",
+                item.get("account", ""),
+                item.get("amount", 0),
+                item.get("category", ""),
+            ))
+        for exp in savings_expenses:
+            card_user = exp.get("payment_method", "Expense Entry")
+            if exp.get("authorized_user", ""):
+                card_user = f"{card_user} / {exp['authorized_user']}"
+            rows.append((
+                exp.get("date", ""),
+                "Expense Entry",
+                exp.get("where", ""),
+                exp.get("amount", 0),
+                card_user,
+            ))
+
+        for date, row_type, account, amount, notes in sorted(rows, key=lambda item: item[0], reverse=True):
+            detail_tree.insert("", "end", values=(date, row_type, account, f"${amount:.2f}", notes))
+
+        if not rows:
+            detail_tree.insert("", "end", values=("", "No transfers", "", "$0.00", ""))
+
+        footer = tk.Frame(window, bg=self.colors["surface"], padx=12, pady=10)
+        footer.pack(fill="x")
+        ttk.Button(footer, text="Close", command=window.destroy, style="TButton").pack(side="right")
+
     def on_expense_click(self, event):
         _, expenses = self.get_month_data(self.current_month)
-        if event.inaxes != self.expense_ax or not expenses:
+        category_totals = self.get_expense_breakdown_totals(expenses)
+        if event.inaxes != self.expense_ax or not category_totals:
             return
         for i, wedge in enumerate(self.expense_wedges):
             if wedge.contains_point([event.x, event.y]):
                 category = self.expense_categories[i]
-                category_expenses = [exp for exp in expenses if exp["category"] == category]
+                category_expenses = [
+                    exp for exp in expenses
+                    if self.normalize_category(exp.get("category", "")) == category
+                ]
                 self.show_expense_category_popup(category, category_expenses)
                 break
 
-    def show_expense_category_popup(self, category, expenses):
+    def show_expense_category_popup(self, category, expenses, savings=None):
+        savings = savings or []
         if hasattr(self, "expense_detail_window") and self.expense_detail_window.winfo_exists():
             self.expense_detail_window.destroy()
 
-        total = sum(exp["amount"] for exp in expenses)
+        total = sum(exp["amount"] for exp in expenses) + sum(item["amount"] for item in savings)
         window = tk.Toplevel(self.root)
         self.expense_detail_window = window
         window.title(f"{category} Expenses")
@@ -1621,6 +1857,12 @@ class BudgetTracker:
                 "",
                 "end",
                 values=(exp["date"], exp["where"], f"${exp['amount']:.2f}", card_user),
+            )
+        for item in sorted(savings, key=lambda entry: entry["date"], reverse=True):
+            detail_tree.insert(
+                "",
+                "end",
+                values=(item["date"], item["account"], f"${item['amount']:.2f}", "Saving/Investment"),
             )
 
         footer = tk.Frame(window, bg=self.colors["surface"], padx=12, pady=10)
@@ -1773,7 +2015,7 @@ class BudgetTracker:
         
         tk.Label(frame, text="Category:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=3, column=0, padx=5, pady=5, sticky="e")
         category_var = tk.StringVar(value=category)
-        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.categories)
+        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.get_expense_category_options(category))
         category_combo.grid(row=3, column=1, padx=5, pady=5)
 
         tk.Label(frame, text="Payment:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=4, column=0, padx=5, pady=5, sticky="e")
@@ -1809,6 +2051,100 @@ class BudgetTracker:
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
         
+        ttk.Button(window, text="Save Changes", command=save_edit).pack(pady=20)
+
+    def edit_saving(self):
+        selected = self.savings_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a saved/invested transfer to edit.")
+            return
+
+        item = self.savings_tree.item(selected[0])
+        values = item['values']
+        if not values or values[0] == "":
+            messagebox.showwarning("Warning", "Please select a valid saved/invested transfer.")
+            return
+
+        date, account, amount_str, category = values
+        amount = float(amount_str.replace("$", ""))
+
+        for i, saving in enumerate(self.all_savings):
+            if (saving["date"] == date and saving["account"] == account and
+                saving["amount"] == amount and saving.get("category", "Other") == category):
+                saving_index = i
+                break
+        else:
+            messagebox.showerror("Error", "Saved/invested transfer not found.")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Edit Saving/Investment")
+        window.geometry("440x430")
+        window.configure(bg=self.colors["surface"])
+
+        tk.Label(window, text="Edit Saving / Investment", font=("Arial", 16, "bold"),
+                fg=self.colors["text"], bg=self.colors["surface"]).pack(pady=10)
+
+        frame = tk.Frame(window, bg=self.colors["surface"])
+        frame.pack(pady=10)
+
+        tk.Label(frame, text="Account:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        account_entry = ttk.Entry(frame)
+        account_entry.grid(row=0, column=1, padx=5, pady=5)
+        account_entry.insert(0, account)
+
+        tk.Label(frame, text="Amount:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        amount_entry = ttk.Entry(frame)
+        amount_entry.grid(row=1, column=1, padx=5, pady=5)
+        amount_entry.insert(0, amount)
+
+        tk.Label(frame, text="Date:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        date_entry = ttk.Entry(frame)
+        date_entry.grid(row=2, column=1, padx=5, pady=5)
+        date_entry.insert(0, date)
+
+        def update_date():
+            top = tk.Toplevel(window)
+            cal = Calendar(top, selectmode="day", date_pattern="y-mm-dd")
+            cal.pack(pady=10)
+
+            def set_date():
+                date_entry.delete(0, tk.END)
+                date_entry.insert(0, cal.get_date())
+                top.destroy()
+
+            ttk.Button(top, text="Select", command=set_date).pack(pady=5)
+
+        ttk.Button(frame, text="Date", command=update_date, width=5).grid(row=2, column=2, padx=5)
+
+        tk.Label(frame, text="Type:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        category_var = tk.StringVar(value=category)
+        category_combo = ttk.Combobox(frame, textvariable=category_var, values=self.saving_categories)
+        category_combo.grid(row=3, column=1, padx=5, pady=5)
+
+        def save_edit():
+            try:
+                new_amount = float(amount_entry.get())
+                new_date = date_entry.get()
+                new_category = category_var.get().strip() or "Other"
+                if new_category not in self.saving_categories:
+                    self.saving_categories.append(new_category)
+                    self.saving_categories.sort(key=str.lower)
+                self.all_savings[saving_index] = {
+                    "account": account_entry.get(),
+                    "amount": new_amount,
+                    "date": new_date,
+                    "category": new_category,
+                    "month": new_date[:7]
+                }
+                self.save_data()
+                self.update_savings_table()
+                self.update_charts()
+                self.month_dropdown['values'] = self.get_month_options()
+                window.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
+
         ttk.Button(window, text="Save Changes", command=save_edit).pack(pady=20)
 
     def delete_income(self):
@@ -1867,6 +2203,35 @@ class BudgetTracker:
         self.save_data()
         self.update_expense_table()
         self.update_charts()
+
+    def delete_saving(self):
+        selected = self.savings_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a saved/invested transfer to delete.")
+            return
+
+        item = self.savings_tree.item(selected[0])
+        values = item['values']
+        if not values or values[0] == "":
+            messagebox.showwarning("Warning", "Please select a valid saved/invested transfer.")
+            return
+
+        date, account, amount_str, category = values
+        amount = float(amount_str.replace("$", ""))
+
+        if not messagebox.askyesno("Confirm", "Are you sure you want to delete this saved/invested transfer?"):
+            return
+
+        for i, saving in enumerate(self.all_savings):
+            if (saving["date"] == date and saving["account"] == account and
+                saving["amount"] == amount and saving.get("category", "Other") == category):
+                del self.all_savings[i]
+                break
+
+        self.save_data()
+        self.update_savings_table()
+        self.update_charts()
+        self.month_dropdown['values'] = self.get_month_options()
 
     def analyze_months(self):
         window = tk.Toplevel(self.root)
