@@ -209,7 +209,7 @@ class BudgetTracker:
                             "source": row["source"],
                             "amount": float(row["amount"]),
                             "date": row["date"],
-                            "month": row["date"][:7]  # Extract YYYY-MM
+                            "month": row["date"][:7]
                         })
                     elif row["type"] == "expense":
                         category = self.normalize_category(row["category"])
@@ -778,12 +778,12 @@ class BudgetTracker:
                     "source": source_entry.get(),
                     "amount": float(amount),
                     "date": date,
-                    "month": date[:7]  # Extract YYYY-MM
+                    "month": date[:7]
                 }
                 self.all_income.append(income)
                 self.update_charts()
                 self.save_data()
-                self.month_dropdown['values'] = self.get_month_options()  # Update dropdown
+                self.month_dropdown['values'] = self.get_month_options()
                 window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
@@ -865,7 +865,7 @@ class BudgetTracker:
                 self.all_expenses.append(expense)
                 self.update_charts()
                 self.save_data()
-                self.month_dropdown['values'] = self.get_month_options()  # Update dropdown
+                self.month_dropdown['values'] = self.get_month_options()
                 window.destroy()
             except ValueError:
                 messagebox.showerror("Error", "Please enter a valid numerical amount (e.g., 50.00)")
