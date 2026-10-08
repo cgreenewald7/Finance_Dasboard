@@ -1,0 +1,8 @@
+# Local environments and generated bundles (existing tracked files are retained).
+.venv*/
+__pycache__/
+*.py[cod]
+build/
+dist/
+release/
+.DS_Store

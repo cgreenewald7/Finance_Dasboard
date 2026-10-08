@@ -7,12 +7,15 @@ from datetime import datetime, timedelta
 import csv
 import os
 from pathlib import Path
+import sys
+
+UI_FONT = "Helvetica Neue" if sys.platform == "darwin" else "Segoe UI"
 
 class BudgetTracker:
-    def __init__(self):
+    def __init__(self, data_dir=None):
         # user specific directory for CSV file
         home_dir = Path.home()
-        data_dir = home_dir / "Documents" / "BudgetTracker"
+        data_dir = Path(data_dir) if data_dir is not None else home_dir / "Documents" / "BudgetTracker"
         data_dir.mkdir(parents=True, exist_ok=True)
         self.data_file = data_dir / "budget_data.csv"            
 
@@ -86,7 +89,7 @@ class BudgetTracker:
 
     def configure_styles(self):
         self.style.configure("TButton", 
-                            font=("Segoe UI", 11, "bold"),
+                            font=(UI_FONT, 11, "bold"),
                             background=self.colors["primary"],
                             foreground="white",
                             borderwidth=0,
@@ -102,7 +105,7 @@ class BudgetTracker:
                             foreground=self.colors["text"],
                             arrowcolor="white",
                             borderwidth=0,
-                            font=("Segoe UI", 11),
+                            font=(UI_FONT, 11),
                             padding=5)
         self.style.map("TCombobox",
                     fieldbackground=[('readonly', self.colors["surface"])],
@@ -118,13 +121,13 @@ class BudgetTracker:
                             background=self.colors["surface"],
                             foreground=self.colors["text"],
                             fieldbackground=self.colors["surface"],
-                            font=("Segoe UI", 10),
+                            font=(UI_FONT, 10),
                             rowheight=30,
                             borderwidth=0,
                             relief="flat",
                             highlightthickness=0)
         self.style.configure("Treeview.Heading",
-                            font=("Segoe UI", 10, "bold"),
+                            font=(UI_FONT, 10, "bold"),
                             background=self.colors["surface_alt"],
                             foreground=self.colors["text"],
                             borderwidth=1,
@@ -546,14 +549,14 @@ class BudgetTracker:
         
         title_label = tk.Label(header_frame, 
                             text="Budget Tracker",
-                            font=("Segoe UI", 24, "bold"),
+                            font=(UI_FONT, 24, "bold"),
                             fg=self.colors["text"],
                             bg=self.colors["surface"])
         title_label.pack(side="left")
 
         subtitle_label = tk.Label(header_frame,
                                 text=f"Local CSV: {self.data_file}",
-                                font=("Segoe UI", 9),
+                                font=(UI_FONT, 9),
                                 fg=self.colors["muted"],
                                 bg=self.colors["surface"])
         subtitle_label.pack(side="left", padx=(12, 0), pady=(8, 0))
@@ -563,7 +566,7 @@ class BudgetTracker:
                                         values=self.get_month_options(), state="readonly", width=12)
         self.month_dropdown.pack(side="right", padx=(10, 0))
         self.month_dropdown.bind("<<ComboboxSelected>>", self.update_month_view)
-        tk.Label(header_frame, text="Month", font=("Segoe UI", 10, "bold"),
+        tk.Label(header_frame, text="Month", font=(UI_FONT, 10, "bold"),
                 fg=self.colors["muted"], bg=self.colors["surface"]).pack(side="right")
         
         button_frame = tk.Frame(self.root, bg=self.colors["bg"], padx=24, pady=14)
@@ -601,9 +604,9 @@ class BudgetTracker:
             card = tk.Frame(self.summary_frame, bg=self.colors["surface"], padx=18, pady=12,
                             highlightbackground=self.colors["border"], highlightthickness=1)
             card.pack(side="left", fill="x", expand=True, padx=(0, 10))
-            tk.Label(card, text=label, font=("Segoe UI", 9, "bold"), fg=self.colors["muted"],
+            tk.Label(card, text=label, font=(UI_FONT, 9, "bold"), fg=self.colors["muted"],
                     bg=self.colors["surface"]).pack(anchor="w")
-            value = tk.Label(card, text="$0.00", font=("Segoe UI", 18, "bold"),
+            value = tk.Label(card, text="$0.00", font=(UI_FONT, 18, "bold"),
                             fg=self.colors["text"], bg=self.colors["surface"])
             value.pack(anchor="w", pady=(3, 0))
             self.summary_labels[key] = value
@@ -772,7 +775,7 @@ class BudgetTracker:
         self.net_frame = tk.Frame(self.root, bg=self.colors["bg"])
         self.net_frame.pack(fill="x", pady=5)
         self.net_label = tk.Label(self.net_frame, text="Net Income: $0.00", 
-                                font=("Segoe UI", 14, "bold"), bg=self.colors["bg"])
+                                font=(UI_FONT, 14, "bold"), bg=self.colors["bg"])
         self.net_label.pack()
 
         self.update_charts()
@@ -898,7 +901,7 @@ class BudgetTracker:
         category_combo.grid(row=3, column=1, padx=5, pady=5)
         category_combo.set("Other")
         tk.Label(frame, text="Type a new category to save it for future entries.",
-                fg=self.colors["muted"], bg=self.colors["surface"], font=("Segoe UI", 8)).grid(row=4, column=1, columnspan=2, sticky="w", padx=5)
+                fg=self.colors["muted"], bg=self.colors["surface"], font=(UI_FONT, 8)).grid(row=4, column=1, columnspan=2, sticky="w", padx=5)
 
         tk.Label(frame, text="Payment:", fg=self.colors["text"], bg=self.colors["surface"]).grid(row=5, column=0, padx=5, pady=5, sticky="e")
         payment_var = tk.StringVar(value="Debit Card")
@@ -909,7 +912,7 @@ class BudgetTracker:
         authorized_user_entry = ttk.Entry(frame)
         authorized_user_entry.grid(row=6, column=1, padx=5, pady=5)
         tk.Label(frame, text="Use for credit card spending by another cardholder.",
-                fg=self.colors["muted"], bg=self.colors["surface"], font=("Segoe UI", 8)).grid(row=7, column=1, columnspan=2, sticky="w", padx=5)
+                fg=self.colors["muted"], bg=self.colors["surface"], font=(UI_FONT, 8)).grid(row=7, column=1, columnspan=2, sticky="w", padx=5)
         
         def add_expense():
             try:
@@ -982,7 +985,7 @@ class BudgetTracker:
         category_combo.grid(row=3, column=1, padx=5, pady=5)
 
         tk.Label(frame, text="Tracked as money not spent, not as an expense.",
-                fg=self.colors["muted"], bg=self.colors["surface"], font=("Segoe UI", 8)).grid(row=4, column=1, columnspan=2, sticky="w", padx=5)
+                fg=self.colors["muted"], bg=self.colors["surface"], font=(UI_FONT, 8)).grid(row=4, column=1, columnspan=2, sticky="w", padx=5)
 
         def add_saving():
             try:
@@ -1021,12 +1024,12 @@ class BudgetTracker:
 
         header = tk.Frame(window, bg=self.colors["surface"], padx=16, pady=12)
         header.grid(row=0, column=0, sticky="ew")
-        tk.Label(header, text="Goals & Categories", font=("Segoe UI", 18, "bold"),
+        tk.Label(header, text="Goals & Categories", font=(UI_FONT, 18, "bold"),
                 fg=self.colors["text"], bg=self.colors["surface"]).pack(anchor="w")
         tk.Label(
             header,
             text="Add a monthly goal for any spending category as a dollar amount or as a percent of income. Progress bars show whether you are within the goal or over it.",
-            font=("Segoe UI", 9),
+            font=(UI_FONT, 9),
             fg=self.colors["muted"],
             bg=self.colors["surface"],
             wraplength=560,
@@ -1037,12 +1040,12 @@ class BudgetTracker:
         category_frame.grid(row=1, column=0, sticky="nsew")
         category_frame.grid_rowconfigure(2, weight=1)
         category_frame.grid_columnconfigure(0, weight=1)
-        tk.Label(category_frame, text="Category Goals", font=("Segoe UI", 12, "bold"),
+        tk.Label(category_frame, text="Category Goals", font=(UI_FONT, 12, "bold"),
                 fg=self.colors["text"], bg=self.colors["surface"]).grid(row=0, column=0, sticky="w", pady=(0, 6))
         tk.Label(
             category_frame,
             text="Select an existing category or type a new one, enter the limit, choose Dollars or Percent of Income, then click Add / Update Goal.",
-            font=("Segoe UI", 9),
+            font=(UI_FONT, 9),
             fg=self.colors["muted"],
             bg=self.colors["surface"],
             wraplength=560,
@@ -1263,7 +1266,7 @@ class BudgetTracker:
         wrapper = tk.Frame(self.budget_frame, bg=self.colors["surface"], padx=16, pady=12,
                            highlightbackground=self.colors["border"], highlightthickness=1)
         wrapper.pack(fill="x", padx=24, pady=6)
-        tk.Label(wrapper, text="Goal Progress", font=("Segoe UI", 13, "bold"),
+        tk.Label(wrapper, text="Goal Progress", font=(UI_FONT, 13, "bold"),
                 fg=self.colors["text"], bg=self.colors["surface"]).pack(anchor="w")
 
         list_container = tk.Frame(wrapper, bg=self.colors["surface"])
@@ -1311,7 +1314,7 @@ class BudgetTracker:
             tk.Label(
                 rows_frame,
                 text="No category goals yet. Open Goals & Categories to add a monthly dollar limit for a category.",
-                font=("Segoe UI", 10),
+                font=(UI_FONT, 10),
                 fg=self.colors["muted"],
                 bg=self.colors["surface"],
             ).pack(anchor="w", pady=(8, 0))
@@ -1336,9 +1339,9 @@ class BudgetTracker:
         status_color = self.colors["good"] if is_good else self.colors["bad"]
         bar_color = self.colors["good"] if is_good else self.colors["bad"]
         goal_text = f"${spent:.2f} / {goal_label} - {status}"
-        tk.Label(top, text=label, font=("Segoe UI", 10, "bold"),
+        tk.Label(top, text=label, font=(UI_FONT, 10, "bold"),
                 fg=self.colors["text"], bg=self.colors["surface"]).pack(side="left")
-        tk.Label(top, text=goal_text, font=("Segoe UI", 10),
+        tk.Label(top, text=goal_text, font=(UI_FONT, 10),
                 fg=status_color, bg=self.colors["surface"]).pack(side="right")
 
         bar = tk.Canvas(row, height=14, bg=self.colors["surface"], highlightthickness=0)
@@ -1652,9 +1655,9 @@ class BudgetTracker:
 
         header = tk.Frame(window, bg=self.colors["surface"], padx=16, pady=12)
         header.pack(fill="x")
-        tk.Label(header, text=source, font=("Segoe UI", 16, "bold"),
+        tk.Label(header, text=source, font=(UI_FONT, 16, "bold"),
                 fg=self.colors["text"], bg=self.colors["surface"]).pack(anchor="w")
-        tk.Label(header, text=f"Total: ${total:.2f}", font=("Segoe UI", 12, "bold"),
+        tk.Label(header, text=f"Total: ${total:.2f}", font=(UI_FONT, 12, "bold"),
                 fg=self.colors["accent"], bg=self.colors["surface"]).pack(anchor="w", pady=(4, 0))
 
         table_frame = tk.Frame(window, bg=self.colors["surface"], padx=12)
@@ -1708,14 +1711,14 @@ class BudgetTracker:
         tk.Label(
             header,
             text="Saved / Invested",
-            font=("Segoe UI", 16, "bold"),
+            font=(UI_FONT, 16, "bold"),
             fg=self.colors["text"],
             bg=self.colors["surface"],
         ).pack(anchor="w")
         tk.Label(
             header,
             text=f"Total: ${total:.2f}",
-            font=("Segoe UI", 12, "bold"),
+            font=(UI_FONT, 12, "bold"),
             fg=self.colors["accent"],
             bg=self.colors["surface"],
         ).pack(anchor="w", pady=(4, 0))
@@ -1815,14 +1818,14 @@ class BudgetTracker:
         tk.Label(
             header,
             text=category,
-            font=("Segoe UI", 16, "bold"),
+            font=(UI_FONT, 16, "bold"),
             fg=self.colors["text"],
             bg=self.colors["surface"],
         ).pack(anchor="w")
         tk.Label(
             header,
             text=f"Total: ${total:.2f}",
-            font=("Segoe UI", 12, "bold"),
+            font=(UI_FONT, 12, "bold"),
             fg=self.colors["accent"],
             bg=self.colors["surface"],
         ).pack(anchor="w", pady=(4, 0))
@@ -2028,7 +2031,7 @@ class BudgetTracker:
         authorized_user_entry.grid(row=5, column=1, padx=5, pady=5)
         authorized_user_entry.insert(0, authorized_user)
         tk.Label(frame, text="Use for credit card spending by another cardholder.",
-                fg=self.colors["muted"], bg=self.colors["surface"], font=("Segoe UI", 8)).grid(row=6, column=1, columnspan=2, sticky="w", padx=5)
+                fg=self.colors["muted"], bg=self.colors["surface"], font=(UI_FONT, 8)).grid(row=6, column=1, columnspan=2, sticky="w", padx=5)
         
         def save_edit():
             try:
@@ -2358,5 +2361,9 @@ class BudgetTracker:
         self.root.mainloop()
 
 if __name__ == "__main__":
-    tracker = BudgetTracker()
-    tracker.run()
+    if "--smoke-test" in sys.argv:
+        from release_checks import run_checks
+        run_checks()
+    else:
+        tracker = BudgetTracker()
+        tracker.run()
