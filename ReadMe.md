@@ -23,11 +23,3 @@ Download from [Releases](https://github.com/cgreenewald7/Finance_Dasboard/releas
 
 Pin to your taskbar for easy access. 
 Data is saved to `~/Documents/BudgetTracker/budget_data.csv` on your device.
-
-### macOS
-
-Native Apple Silicon and Intel packaging is available for macOS 15+ with all
-current app features, including Excel export, category goals and dark mode.
-See [the macOS release guide](MACOS_RELEASE.md) for exact build, push and
-publication steps. The free build uses ad-hoc signing; macOS may require
-**System Settings → Privacy & Security → Open Anyway** on first launch.
