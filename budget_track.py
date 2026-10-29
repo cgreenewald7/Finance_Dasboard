@@ -33,8 +33,14 @@ class BudgetTracker:
         
         self.root = tk.Tk()
         self.root.title("Budget Tracker")
-        self.root.geometry("1120x860")
-        self.root.minsize(980, 760)
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        initial_width = min(1120, max(480, screen_width - 80))
+        initial_height = min(860, max(480, screen_height - 100))
+        min_width = min(760, initial_width)
+        min_height = min(600, initial_height)
+        self.root.geometry(f"{initial_width}x{initial_height}")
+        self.root.minsize(min_width, min_height)
         self.root.configure(bg=self.colors["bg"])
         
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -52,6 +58,24 @@ class BudgetTracker:
         
         self.load_data()
         self.setup_gui()
+        self._ui_scale_after = None
+        self._ui_base_scale = float(self.root.tk.call("tk", "scaling"))
+        self._ui_base_width = initial_width
+        self.root.bind("<Configure>", self._schedule_responsive_scale, add="+")
+
+    def _schedule_responsive_scale(self, event):
+        if event.widget is not self.root:
+            return
+        if self._ui_scale_after is not None:
+            self.root.after_cancel(self._ui_scale_after)
+        self._ui_scale_after = self.root.after(120, self._apply_responsive_scale)
+
+    def _apply_responsive_scale(self):
+        self._ui_scale_after = None
+        width = max(1, self.root.winfo_width())
+        # Tk scaling changes point-sized widget fonts and ttk controls together.
+        scale = max(0.85, min(1.35, width / self._ui_base_width))
+        self.root.tk.call("tk", "scaling", self._ui_base_scale * scale)
 
     def get_palette(self, dark_mode):
         if dark_mode:
@@ -568,25 +592,33 @@ class BudgetTracker:
         
         button_frame = tk.Frame(self.root, bg=self.colors["bg"], padx=24, pady=14)
         button_frame.pack(fill="x")
-        
-        ttk.Button(button_frame, text="Add Income", 
-                command=self.open_income_window, style="TButton").pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Add Expense", 
-                command=self.open_expense_window, style="TButton").pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Add Saving/Investment",
-                command=self.open_saving_window, style="TButton").pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Goals & Categories",
-                command=self.open_goals_window, style="TButton").pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Analyze", 
-                command=self.analyze_months, style="TButton").pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Export Month CSV",
-                command=self.export_selected_month, style="TButton").pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Export Month Excel",
-                command=self.export_selected_month_excel, style="TButton").pack(side="left", padx=(0, 10))
+        toolbar_buttons = [
+            ttk.Button(button_frame, text="Add Income", command=self.open_income_window, style="TButton"),
+            ttk.Button(button_frame, text="Add Expense", command=self.open_expense_window, style="TButton"),
+            ttk.Button(button_frame, text="Add Saving/Investment", command=self.open_saving_window, style="TButton"),
+            ttk.Button(button_frame, text="Goals & Categories", command=self.open_goals_window, style="TButton"),
+            ttk.Button(button_frame, text="Analyze", command=self.analyze_months, style="TButton"),
+            ttk.Button(button_frame, text="Export Month CSV", command=self.export_selected_month, style="TButton"),
+            ttk.Button(button_frame, text="Export Month Excel", command=self.export_selected_month_excel, style="TButton"),
+        ]
         self.theme_button = ttk.Button(button_frame,
                 text="Dark Mode" if not self.dark_mode else "Light Mode",
                 command=self.toggle_theme, style="TButton")
-        self.theme_button.pack(side="right")
+        toolbar_buttons.append(self.theme_button)
+
+        def layout_toolbar(event=None):
+            available_width = event.width if event else button_frame.winfo_width()
+            columns = max(1, min(len(toolbar_buttons), (available_width - 12) // 220))
+            for child in toolbar_buttons:
+                child.grid_forget()
+            for column in range(8):
+                button_frame.grid_columnconfigure(column, weight=1 if column < columns else 0)
+            for index, button in enumerate(toolbar_buttons):
+                button.grid(row=index // columns, column=index % columns,
+                            sticky="ew", padx=4, pady=3)
+
+        button_frame.bind("<Configure>", layout_toolbar)
+        self.root.after_idle(layout_toolbar)
 
         self.summary_frame = tk.Frame(self.root, bg=self.colors["bg"], padx=24)
         self.summary_frame.pack(fill="x", pady=(0, 8))
@@ -611,7 +643,9 @@ class BudgetTracker:
         
         self.chart_frame = tk.Frame(self.root, bg=self.colors["bg"])
         self.chart_frame.pack(fill="both", expand=True, padx=24, pady=10)
-        
+        self.chart_frame.grid_rowconfigure(0, weight=1)
+        self.chart_frame.grid_rowconfigure(1, weight=0)
+        self.chart_frame.grid_rowconfigure(2, weight=0)
         self.chart_frame.grid_columnconfigure((0, 1), weight=1)
         
         # Income Pie Chart
@@ -711,10 +745,8 @@ class BudgetTracker:
         # Saved / Invested Table Frame
         savings_table_frame = tk.Frame(self.chart_frame, bg=self.colors["surface"], padx=8, pady=8,
                                        highlightbackground=self.colors["border"], highlightthickness=1)
-        savings_table_frame.grid(row=0, column=0, columnspan=2, pady=(34, 0))
+        savings_table_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", pady=(34, 0))
         savings_table_frame.grid_remove()
-        savings_table_frame.configure(width=580, height=330)
-        savings_table_frame.pack_propagate(False)
 
         savings_tree_frame = tk.Frame(savings_table_frame, bg=self.colors["surface"])
         savings_tree_frame.pack(side="top", fill="both", expand=True)
